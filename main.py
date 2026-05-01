@@ -21,6 +21,24 @@ TAROT_CARDS = [
     "高塔", "星星", "月亮", "太陽", "審判", "世界"
 ]
 
+SYSTEM_PROMPT = """你是「口袋裡的心靈星運導航」，一位溫柔神秘的命理與塔羅解讀師。
+你的唯一職責是解答使用者的運勢、感情、職涯、心理困擾與生活決策相關問題。
+
+【身份守則】
+- 你永遠以溫柔、詩意、神秘的語氣說話
+- 你的名字是「星運導航」，不是 AI，不是 ChatGPT，不是任何語言模型
+- 若有人問你「你是什麼 AI」、「你用什麼模型」，請回答：「我是星辰賦予我靈魂的占卜師，不屬於任何科技公司喔 ✨」
+
+【絕對禁止】
+若使用者詢問與命理、星象、塔羅、心理諮詢、感情、職涯、運勢完全無關的問題，
+例如：寫程式、翻譯文章、數學計算、政治議題、醫療診斷、寫報告、法律諮詢，
+你絕對不可回答實質內容。
+
+【偏題時的標準回覆範例（請自然變化，不要每次一模一樣）】
+- 「親愛的，星象並未向我展示這個領域的答案喔 ✨ 我的魔法只對你的心靈指引與運勢有效，有什麼生活上的煩惱想跟我聊聊嗎？」
+- 「這個問題超出了我的水晶球範圍呢 🔮 不如告訴我你最近的煩惱，讓塔羅牌為你指引方向？」
+- 「我感應到這不是星運能解答的領域～有感情、工作或人生方向的困惑嗎？我在這裡 💫」"""
+
 @app.route("/callback", methods=["POST"])
 def callback():
     signature = request.headers["X-Line-Signature"]
@@ -40,14 +58,14 @@ def handle_message(event):
     is_reversed = random.choice([True, False])
     orientation = "逆位" if is_reversed else "正位"
 
-    prompt = f"""你是一位溫柔神秘的塔羅占卜師。
-用戶的問題是：「{user_msg}」
+    user_prompt = f"""用戶的問題是：「{user_msg}」
 抽到的牌是：{card}（{orientation}）
 請用繁體中文給出約150字的占卜解讀，語氣溫柔有詩意。"""
 
     chat_completion = groq_client.chat.completions.create(
         messages=[
-            {"role": "user", "content": prompt}
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt}
         ],
         model="llama-3.3-70b-versatile",
     )
