@@ -43,7 +43,7 @@ def handle_message(event):
 抽到的牌是：{card}（{orientation}）
 請用繁體中文給出約150字的占卜解讀，語氣溫柔有詩意。"""
 
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-2.0-flash")
     response = model.generate_content(prompt)
     reply_text = f"🃏 你抽到了【{card}｜{orientation}】\n\n{response.text}"
 
