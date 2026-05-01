@@ -46,7 +46,7 @@ def handle_message(event):
 請用繁體中文給出約150字的占卜解讀，語氣溫柔有詩意。"""
 
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.0-flash-lite"
         contents=prompt
     )
     reply_text = f"🃏 你抽到了【{card}｜{orientation}】\n\n{response.text}"
