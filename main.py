@@ -3,7 +3,7 @@ from linebot.v3.webhook import WebhookHandler
 from linebot.v3.messaging import ApiClient, Configuration, MessagingApi, ReplyMessageRequest, TextMessage
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
 from linebot.v3.exceptions import InvalidSignatureError
-import google.genai as genai
+from groq import Groq
 from supabase import create_client
 import os, random, datetime
 
@@ -12,7 +12,7 @@ app = Flask(__name__)
 configuration = Configuration(access_token=os.environ.get("LINE_ACCESS_TOKEN"))
 handler = WebhookHandler(os.environ.get("LINE_CHANNEL_SECRET"))
 
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 supabase = create_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_KEY"))
 
 TAROT_CARDS = [
@@ -45,11 +45,15 @@ def handle_message(event):
 抽到的牌是：{card}（{orientation}）
 請用繁體中文給出約150字的占卜解讀，語氣溫柔有詩意。"""
 
-    response = client.models.generate_content(
-        model="gemini-2.0-flash-lite"
-        contents=prompt
+    chat_completion = groq_client.chat.completions.create(
+        messages=[
+            {"role": "user", "content": prompt}
+        ],
+        model="llama-3.3-70b-versatile",
     )
-    reply_text = f"🃏 你抽到了【{card}｜{orientation}】\n\n{response.text}"
+    response_text = chat_completion.choices[0].message.content
+
+    reply_text = f"🃏 你抽到了【{card}｜{orientation}】\n\n{response_text}"
 
     # 儲存到 Supabase
     try:
@@ -57,7 +61,7 @@ def handle_message(event):
             "user_id": user_id,
             "question": user_msg,
             "card": f"{card}｜{orientation}",
-            "response": response.text,
+            "response": response_text,
             "created_at": datetime.datetime.utcnow().isoformat()
         }).execute()
     except:
