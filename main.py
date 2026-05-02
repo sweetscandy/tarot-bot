@@ -23,6 +23,8 @@ handler = WebhookHandler(os.environ.get("LINE_CHANNEL_SECRET"))
 groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 supabase = create_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_KEY"))
 
+FREE_READING_LIMIT = 5  # 免費占卜次數上限
+
 TAROT_CARDS = [
     "愚者", "魔術師", "女祭司", "女皇", "皇帝", "教皇", "戀人", "戰車",
     "力量", "隱者", "命運之輪", "正義", "倒吊人", "死神", "節制", "惡魔",
@@ -78,14 +80,24 @@ def get_or_create_user(line_user_id):
             "line_user_id": line_user_id,
             "tokens": 1,
             "plan": "free",
-            "daily_push": True
+            "daily_push": True,
+            "birthdate_locked": False,   # ✅ 新增
+            "free_readings_used": 0      # ✅ 新增
         }).execute()
         supabase.table("token_logs").insert({
             "line_user_id": line_user_id,
             "change": 1,
             "reason": "註冊贈送"
         }).execute()
-        return {"line_user_id": line_user_id, "tokens": 1, "plan": "free", "birth_date": None, "daily_push": True}
+        return {
+            "line_user_id": line_user_id,
+            "tokens": 1,
+            "plan": "free",
+            "birth_date": None,
+            "daily_push": True,
+            "birthdate_locked": False,   # ✅ 新增
+            "free_readings_used": 0      # ✅ 新增
+        }
     return result.data[0]
 
 
@@ -104,11 +116,51 @@ def use_token(line_user_id):
     return True
 
 
+def check_free_reading_quota(line_user_id, user):
+    """
+    檢查免費占卜額度
+    回傳 (can_read: bool, message: str or None)
+    """
+    plan = user.get("plan", "free")
+    if plan == "vip":
+        return True, None  # VIP 無限制
+
+    used = user.get("free_readings_used", 0) or 0
+    if used >= FREE_READING_LIMIT:
+        msg = (
+            f"🔮 你的 {FREE_READING_LIMIT} 次免費占卜已用完囉～\n\n"
+            "想繼續獲得星運指引，有兩個方式：\n"
+            "💎 使用「急救代幣」進行深度占卜\n"
+            "✨ 儲值代幣包，繼續探索命運的軌跡\n\n"
+            "輸入「我的代幣」查看目前餘額 🌙"
+        )
+        return False, msg
+    return True, None
+
+
+def increment_free_reading(line_user_id, user):
+    """免費占卜次數 +1（VIP 不計算）"""
+    if user.get("plan", "free") == "vip":
+        return
+    used = user.get("free_readings_used", 0) or 0
+    supabase.table("users").update(
+        {"free_readings_used": used + 1}
+    ).eq("line_user_id", line_user_id).execute()
+
+
 # ══════════════════════════════════════════
 #  Flex Message 工廠
 # ══════════════════════════════════════════
 
-def build_date_picker_flex():
+def build_date_picker_flex(is_rebound=False):
+    """
+    is_rebound=True 時顯示「改綁需消耗 1 枚代幣」的說明
+    """
+    if is_rebound:
+        desc_text = "⚠️ 你的生辰已綁定。\n改綁將消耗 1 枚急救代幣，確定要繼續嗎？\n\n請選擇新的出生日期 🌟"
+    else:
+        desc_text = "我想更懂你一點，才能在你需要的時候，給出最適合的建議 💫\n\n請選擇你的出生日期，讓我為你排出專屬星盤 🌟"
+
     flex_content = {
         "type": "bubble",
         "body": {
@@ -125,7 +177,7 @@ def build_date_picker_flex():
                 },
                 {
                     "type": "text",
-                    "text": "我想更懂你一點，才能在你需要的時候，給出最適合的建議 💫\n\n請選擇你的出生日期，讓我為你排出專屬星盤 🌟",
+                    "text": desc_text,
                     "wrap": True,
                     "color": "#666666",
                     "size": "sm"
@@ -204,7 +256,6 @@ def build_history_flex(logs):
 
 
 def build_daily_flex(card, orientation, reading, zodiac, today_str):
-    """每日運勢專屬 Flex Bubble"""
     zodiac_text = f"⭐ {zodiac}" if zodiac else "🔮 塔羅每日運勢"
     flex_content = {
         "type": "bubble",
@@ -289,7 +340,7 @@ def build_daily_flex(card, orientation, reading, zodiac, today_str):
 #  占卜核心
 # ══════════════════════════════════════════
 
-def do_tarot_reading(line_user_id, user_msg, is_deep=False, zodiac=None):
+def do_tarot_reading(line_user_id, user_msg, is_deep=False, zodiac=None, user=None):
     card = random.choice(TAROT_CARDS)
     orientation = "逆位" if random.choice([True, False]) else "正位"
 
@@ -321,12 +372,15 @@ def do_tarot_reading(line_user_id, user_msg, is_deep=False, zodiac=None):
     except Exception as e:
         print(f"tarot_logs 寫入錯誤: {e}")
 
+    # ✅ 一般占卜才計算免費次數
+    if not is_deep and user:
+        increment_free_reading(line_user_id, user)
+
     prefix = "🆘 急救占卜｜深度解牌\n\n" if is_deep else ""
     return f"{prefix}🃏 你抽到了【{card}｜{orientation}】\n\n{response_text}"
 
 
 def do_daily_push():
-    """每天早上 8:00 推播每日運勢給所有用戶"""
     print(f"[排程] 每日推播啟動：{datetime.datetime.now()}")
     tz = pytz.timezone("Asia/Taipei")
     today_str = datetime.datetime.now(tz).strftime("%Y年%m月%d日")
@@ -402,12 +456,10 @@ pending_deep_reading = set()
 #  Webhook 路由
 # ══════════════════════════════════════════
 
-# ── ✅ 新增 1：Health Check 路由（UptimeRobot / Render Cron 保活用）──
 @app.route("/", methods=["GET"])
 def health_check():
     return "OK", 200
 
-# ── ✅ 新增 2：手動觸發每日推播（測試用）──
 @app.route("/push-now", methods=["GET"])
 def push_now():
     do_daily_push()
@@ -471,7 +523,7 @@ def handle_message(event):
         else:
             reply_text = do_tarot_reading(
                 line_user_id, user_msg,
-                is_deep=True, zodiac=zodiac
+                is_deep=True, zodiac=zodiac, user=user
             )
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(
@@ -484,30 +536,64 @@ def handle_message(event):
 
     # 指令路由
     if user_msg in ["綁定生辰", "設定生日", "綁定生日"]:
-        with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(
-                ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[build_date_picker_flex()]
+        # ✅ 判斷是否已鎖定
+        is_locked = user.get("birthdate_locked", False)
+        if is_locked:
+            tokens = user.get("tokens", 0)
+            if tokens < 1:
+                reply_text = (
+                    "🔒 你的生辰已綁定，改綁需消耗 1 枚代幣。\n"
+                    "但你目前代幣不足，無法改綁 💎\n\n"
+                    "可儲值代幣後再試 🌙"
                 )
-            )
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(
+                        ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=[TextMessage(text=reply_text)]
+                        )
+                    )
+                return
+            # 代幣足夠，顯示改綁說明
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[build_date_picker_flex(is_rebound=True)]
+                    )
+                )
+        else:
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(
+                    ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[build_date_picker_flex()]
+                    )
+                )
         return
 
     elif user_msg in ["我的代幣", "代幣"]:
+        used = user.get("free_readings_used", 0) or 0
+        remaining = max(0, FREE_READING_LIMIT - used)
         reply_text = (
             f"💎 你目前擁有 {user['tokens']} 枚急救代幣\n"
-            f"每月自動補充 1 枚，或可購買儲值包 ✨"
+            f"🆓 免費占卜剩餘：{remaining} / {FREE_READING_LIMIT} 次\n"
+            f"每月自動補充 1 枚代幣，或可購買儲值包 ✨"
         )
 
     elif user_msg in ["我的方案", "方案"]:
         plan_name = "⭐ 星運 VIP" if user["plan"] == "vip" else "🆓 免費版"
         birth = user.get("birth_date") or "尚未綁定"
         zodiac_text = zodiac or "尚未綁定生辰"
+        locked_text = "🔒 已鎖定" if user.get("birthdate_locked") else "🔓 未鎖定"
+        used = user.get("free_readings_used", 0) or 0
+        remaining = max(0, FREE_READING_LIMIT - used)
         reply_text = (
             f"你目前的方案是：{plan_name}\n"
             f"💎 代幣餘額：{user['tokens']} 枚\n"
-            f"🎂 綁定生辰：{birth}\n"
-            f"⭐ 星座：{zodiac_text}"
+            f"🎂 綁定生辰：{birth}（{locked_text}）\n"
+            f"⭐ 星座：{zodiac_text}\n"
+            f"🆓 免費占卜剩餘：{remaining} / {FREE_READING_LIMIT} 次"
         )
 
     elif user_msg in ["急救占卜"]:
@@ -568,17 +654,24 @@ def handle_message(event):
     elif user_msg in ["說明", "使用說明", "help", "Help"]:
         reply_text = (
             "🔮 星運導航使用說明\n\n"
-            "✨ 直接輸入任何煩惱 → 免費塔羅占卜\n"
+            "✨ 直接輸入任何煩惱 → 免費塔羅占卜（共5次）\n"
             "📅 綁定生辰 → 設定你的生日\n"
             "🆘 急救占卜 → 深度解牌（消耗代幣）\n"
             "📖 我的紀錄 → 查看最近 5 次占卜\n"
-            "💎 我的代幣 → 查詢代幣餘額\n"
+            "💎 我的代幣 → 查詢代幣與免費次數\n"
             "📋 我的方案 → 查詢目前方案\n"
             "🔔 開啟推播 / 關閉推播 → 每日運勢設定"
         )
 
     else:
-        reply_text = do_tarot_reading(line_user_id, user_msg, zodiac=zodiac)
+        # ✅ 檢查免費額度
+        can_read, quota_msg = check_free_reading_quota(line_user_id, user)
+        if not can_read:
+            reply_text = quota_msg
+        else:
+            reply_text = do_tarot_reading(
+                line_user_id, user_msg, zodiac=zodiac, user=user
+            )
 
     with ApiClient(configuration) as api_client:
         MessagingApi(api_client).reply_message(
@@ -597,16 +690,38 @@ def handle_postback(event):
 
     if data == "bind_birth":
         try:
-            get_or_create_user(line_user_id)
+            user = get_or_create_user(line_user_id)
+            is_locked = user.get("birthdate_locked", False)
+
+            if is_locked:
+                # ✅ 改綁：先扣代幣
+                if not use_token(line_user_id):
+                    reply_text = (
+                        "💎 代幣不足，無法改綁生辰。\n"
+                        "請先儲值代幣後再試 🌙"
+                    )
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(
+                            ReplyMessageRequest(
+                                reply_token=event.reply_token,
+                                messages=[TextMessage(text=reply_text)]
+                            )
+                        )
+                    return
+
+            # ✅ 寫入新生辰並鎖定
             supabase.table("users").update({
-                "birth_date": date_str
+                "birth_date": date_str,
+                "birthdate_locked": True
             }).eq("line_user_id", line_user_id).execute()
 
             zodiac = get_zodiac(date_str)
+            lock_hint = "（往後改綁需消耗 1 枚代幣）" if not is_locked else "（已消耗 1 枚代幣）"
             reply_text = (
                 f"✨ 生辰綁定成功！\n"
                 f"🎂 你的生日：{date_str}\n"
-                f"⭐ 你的星座：{zodiac}\n\n"
+                f"⭐ 你的星座：{zodiac}\n"
+                f"🔒 生辰已鎖定 {lock_hint}\n\n"
                 f"星運導航已記住你的星盤\n"
                 f"往後的占卜將融入你的星座特質 🔮"
             )
