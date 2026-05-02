@@ -117,11 +117,17 @@ def use_token(line_user_id):
 
 
 def check_free_reading_quota(line_user_id, user):
+    """每次都從 DB 撈最新值，避免用到記憶體裡的舊資料"""
     plan = user.get("plan", "free")
     if plan == "vip":
         return True, None
 
-    used = user.get("free_readings_used") or 0
+    # ✅ 直接從資料庫撈最新的 free_readings_used
+    result = supabase.table("users").select("free_readings_used").eq("line_user_id", line_user_id).execute()
+    used = 0
+    if result.data:
+        used = result.data[0].get("free_readings_used") or 0
+
     if used >= FREE_READING_LIMIT:
         msg = (
             f"🔮 你的 {FREE_READING_LIMIT} 次免費占卜已用完囉～\n\n"
@@ -135,12 +141,10 @@ def check_free_reading_quota(line_user_id, user):
 
 
 def increment_free_reading(line_user_id, user):
+    """✅ 用 RPC 在資料庫層直接 +1，避免 race condition"""
     if user.get("plan", "free") == "vip":
         return
-    used = user.get("free_readings_used") or 0
-    supabase.table("users").update(
-        {"free_readings_used": used + 1}
-    ).eq("line_user_id", line_user_id).execute()
+    supabase.rpc("increment_free_readings", {"uid": line_user_id}).execute()
 
 
 # ══════════════════════════════════════════
@@ -364,6 +368,7 @@ def do_tarot_reading(line_user_id, user_msg, is_deep=False, zodiac=None, user=No
     except Exception as e:
         print(f"tarot_logs 寫入錯誤: {e}")
 
+    # ✅ 一般占卜才累加免費次數
     if not is_deep and user:
         increment_free_reading(line_user_id, user)
 
@@ -573,24 +578,32 @@ def handle_message(event):
         return
 
     elif user_msg in ["我的代幣", "代幣"]:
-        used = user.get("free_readings_used") or 0
+        # ✅ 從 DB 撈最新值顯示
+        fresh = supabase.table("users").select("free_readings_used, tokens").eq("line_user_id", line_user_id).execute()
+        fresh_data = fresh.data[0] if fresh.data else {}
+        used = fresh_data.get("free_readings_used") or 0
+        tokens = fresh_data.get("tokens") or 0
         remaining = max(0, FREE_READING_LIMIT - used)
         reply_text = (
-            f"💎 你目前擁有 {user['tokens']} 枚急救代幣\n"
+            f"💎 你目前擁有 {tokens} 枚急救代幣\n"
             f"🆓 免費占卜剩餘：{remaining} / {FREE_READING_LIMIT} 次\n"
             f"每月自動補充 1 枚代幣，或可購買儲值包 ✨"
         )
 
     elif user_msg in ["我的方案", "方案"]:
-        plan_name = "⭐ 星運 VIP" if user["plan"] == "vip" else "🆓 免費版"
-        birth = user.get("birth_date") or "尚未綁定"
-        zodiac_text = zodiac or "尚未綁定生辰"
-        locked_text = "🔒 已鎖定" if user.get("birthdate_locked") else "🔓 未鎖定"
-        used = user.get("free_readings_used") or 0
+        # ✅ 從 DB 撈最新值顯示
+        fresh = supabase.table("users").select("free_readings_used, tokens, plan, birth_date, birthdate_locked").eq("line_user_id", line_user_id).execute()
+        fresh_data = fresh.data[0] if fresh.data else {}
+        plan_name = "⭐ 星運 VIP" if fresh_data.get("plan") == "vip" else "🆓 免費版"
+        birth = fresh_data.get("birth_date") or "尚未綁定"
+        zodiac_text = get_zodiac(birth) if fresh_data.get("birth_date") else "尚未綁定生辰"
+        locked_text = "🔒 已鎖定" if fresh_data.get("birthdate_locked") else "🔓 未鎖定"
+        used = fresh_data.get("free_readings_used") or 0
+        tokens = fresh_data.get("tokens") or 0
         remaining = max(0, FREE_READING_LIMIT - used)
         reply_text = (
             f"你目前的方案是：{plan_name}\n"
-            f"💎 代幣餘額：{user['tokens']} 枚\n"
+            f"💎 代幣餘額：{tokens} 枚\n"
             f"🎂 綁定生辰：{birth}（{locked_text}）\n"
             f"⭐ 星座：{zodiac_text}\n"
             f"🆓 免費占卜剩餘：{remaining} / {FREE_READING_LIMIT} 次"
@@ -664,6 +677,7 @@ def handle_message(event):
         )
 
     else:
+        # ✅ check_free_reading_quota 已改為從 DB 撈最新值
         can_read, quota_msg = check_free_reading_quota(line_user_id, user)
         if not can_read:
             reply_text = quota_msg
