@@ -3,3 +3,5 @@ line-bot-sdk
 groq
 supabase
 APScheduler==3.10.4
+gunicorn
+pytz
