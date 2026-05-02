@@ -402,6 +402,17 @@ pending_deep_reading = set()
 #  Webhook 路由
 # ══════════════════════════════════════════
 
+# ── ✅ 新增 1：Health Check 路由（UptimeRobot / Render Cron 保活用）──
+@app.route("/", methods=["GET"])
+def health_check():
+    return "OK", 200
+
+# ── ✅ 新增 2：手動觸發每日推播（測試用）──
+@app.route("/push-now", methods=["GET"])
+def push_now():
+    do_daily_push()
+    return "推播已觸發", 200
+
 @app.route("/callback", methods=["POST"])
 def callback():
     signature = request.headers["X-Line-Signature"]
