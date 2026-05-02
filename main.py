@@ -23,7 +23,7 @@ handler = WebhookHandler(os.environ.get("LINE_CHANNEL_SECRET"))
 groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 supabase = create_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_KEY"))
 
-FREE_READING_LIMIT = 5  # 免費占卜次數上限
+FREE_READING_LIMIT = 5
 
 TAROT_CARDS = [
     "愚者", "魔術師", "女祭司", "女皇", "皇帝", "教皇", "戀人", "戰車",
@@ -81,8 +81,8 @@ def get_or_create_user(line_user_id):
             "tokens": 1,
             "plan": "free",
             "daily_push": True,
-            "birthdate_locked": False,   # ✅ 新增
-            "free_readings_used": 0      # ✅ 新增
+            "birthdate_locked": False,
+            "free_readings_used": 0
         }).execute()
         supabase.table("token_logs").insert({
             "line_user_id": line_user_id,
@@ -95,8 +95,8 @@ def get_or_create_user(line_user_id):
             "plan": "free",
             "birth_date": None,
             "daily_push": True,
-            "birthdate_locked": False,   # ✅ 新增
-            "free_readings_used": 0      # ✅ 新增
+            "birthdate_locked": False,
+            "free_readings_used": 0
         }
     return result.data[0]
 
@@ -117,15 +117,11 @@ def use_token(line_user_id):
 
 
 def check_free_reading_quota(line_user_id, user):
-    """
-    檢查免費占卜額度
-    回傳 (can_read: bool, message: str or None)
-    """
     plan = user.get("plan", "free")
     if plan == "vip":
-        return True, None  # VIP 無限制
+        return True, None
 
-    used = user.get("free_readings_used", 0) or 0
+    used = user.get("free_readings_used") or 0
     if used >= FREE_READING_LIMIT:
         msg = (
             f"🔮 你的 {FREE_READING_LIMIT} 次免費占卜已用完囉～\n\n"
@@ -139,10 +135,9 @@ def check_free_reading_quota(line_user_id, user):
 
 
 def increment_free_reading(line_user_id, user):
-    """免費占卜次數 +1（VIP 不計算）"""
     if user.get("plan", "free") == "vip":
         return
-    used = user.get("free_readings_used", 0) or 0
+    used = user.get("free_readings_used") or 0
     supabase.table("users").update(
         {"free_readings_used": used + 1}
     ).eq("line_user_id", line_user_id).execute()
@@ -153,9 +148,6 @@ def increment_free_reading(line_user_id, user):
 # ══════════════════════════════════════════
 
 def build_date_picker_flex(is_rebound=False):
-    """
-    is_rebound=True 時顯示「改綁需消耗 1 枚代幣」的說明
-    """
     if is_rebound:
         desc_text = "⚠️ 你的生辰已綁定。\n改綁將消耗 1 枚急救代幣，確定要繼續嗎？\n\n請選擇新的出生日期 🌟"
     else:
@@ -367,12 +359,11 @@ def do_tarot_reading(line_user_id, user_msg, is_deep=False, zodiac=None, user=No
             "card_name": f"{card}｜{orientation}",
             "reading": response_text,
             "category": category,
-            "created_at": datetime.datetime.utcnow().isoformat()
+            "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
         }).execute()
     except Exception as e:
         print(f"tarot_logs 寫入錯誤: {e}")
 
-    # ✅ 一般占卜才計算免費次數
     if not is_deep and user:
         increment_free_reading(line_user_id, user)
 
@@ -415,7 +406,6 @@ def do_daily_push():
                 model="llama-3.3-70b-versatile",
             )
             reading = chat_completion.choices[0].message.content
-
             flex_msg = build_daily_flex(card, orientation, reading, zodiac, today_str)
 
             with ApiClient(configuration) as api_client:
@@ -510,6 +500,18 @@ def handle_message(event):
     line_user_id = event.source.user_id
     user_msg = event.message.text.strip()
     user = get_or_create_user(line_user_id)
+
+    # ✅ 防呆：舊帳號 NULL 欄位補預設值
+    needs_update = {}
+    if user.get("free_readings_used") is None:
+        needs_update["free_readings_used"] = 0
+        user["free_readings_used"] = 0
+    if user.get("birthdate_locked") is None:
+        needs_update["birthdate_locked"] = False
+        user["birthdate_locked"] = False
+    if needs_update:
+        supabase.table("users").update(needs_update).eq("line_user_id", line_user_id).execute()
+
     zodiac = get_zodiac(user.get("birth_date")) if user.get("birth_date") else None
 
     # 急救占卜等待輸入中
@@ -536,7 +538,6 @@ def handle_message(event):
 
     # 指令路由
     if user_msg in ["綁定生辰", "設定生日", "綁定生日"]:
-        # ✅ 判斷是否已鎖定
         is_locked = user.get("birthdate_locked", False)
         if is_locked:
             tokens = user.get("tokens", 0)
@@ -554,7 +555,6 @@ def handle_message(event):
                         )
                     )
                 return
-            # 代幣足夠，顯示改綁說明
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(
                     ReplyMessageRequest(
@@ -573,7 +573,7 @@ def handle_message(event):
         return
 
     elif user_msg in ["我的代幣", "代幣"]:
-        used = user.get("free_readings_used", 0) or 0
+        used = user.get("free_readings_used") or 0
         remaining = max(0, FREE_READING_LIMIT - used)
         reply_text = (
             f"💎 你目前擁有 {user['tokens']} 枚急救代幣\n"
@@ -586,7 +586,7 @@ def handle_message(event):
         birth = user.get("birth_date") or "尚未綁定"
         zodiac_text = zodiac or "尚未綁定生辰"
         locked_text = "🔒 已鎖定" if user.get("birthdate_locked") else "🔓 未鎖定"
-        used = user.get("free_readings_used", 0) or 0
+        used = user.get("free_readings_used") or 0
         remaining = max(0, FREE_READING_LIMIT - used)
         reply_text = (
             f"你目前的方案是：{plan_name}\n"
@@ -664,7 +664,6 @@ def handle_message(event):
         )
 
     else:
-        # ✅ 檢查免費額度
         can_read, quota_msg = check_free_reading_quota(line_user_id, user)
         if not can_read:
             reply_text = quota_msg
@@ -694,7 +693,6 @@ def handle_postback(event):
             is_locked = user.get("birthdate_locked", False)
 
             if is_locked:
-                # ✅ 改綁：先扣代幣
                 if not use_token(line_user_id):
                     reply_text = (
                         "💎 代幣不足，無法改綁生辰。\n"
@@ -709,7 +707,6 @@ def handle_postback(event):
                         )
                     return
 
-            # ✅ 寫入新生辰並鎖定
             supabase.table("users").update({
                 "birth_date": date_str,
                 "birthdate_locked": True
@@ -741,4 +738,3 @@ def handle_postback(event):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
