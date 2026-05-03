@@ -23,7 +23,7 @@ handler = WebhookHandler(os.environ.get("LINE_CHANNEL_SECRET"))
 groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 supabase = create_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_KEY"))
 
-FREE_READING_LIMIT = 5
+FREE_READING_LIMIT = 3
 SHOP_URL = "https://tarot-bot-qqqg.onrender.com"
 
 TAROT_CARDS = [
@@ -183,11 +183,11 @@ def check_free_reading_quota(line_user_id, user):
         used = result.data[0].get("free_readings_used") or 0
     if used >= FREE_READING_LIMIT:
         msg = (
-            f"🔮 您的 {FREE_READING_LIMIT} 次免費占卜已用完囉～\n\n"
+            f"🔮 您本月 {FREE_READING_LIMIT} 次免費占卜已用完囉～\n\n"
             "老師還想繼續為您指引，有兩個方式：\n"
-            "💎 使用「急救代幣」進行深度占卜\n"
-            "✨ 儲值代幣包，繼續探索命運的軌跡\n\n"
-            "輸入「我的代幣」查看目前餘額 🌙"
+            "💎 購買代幣包，繼續探索命運的軌跡\n"
+            "👑 升級月訂閱，每月 15 次靈性占卜額度\n\n"
+            "輸入「星運VIP」查看方案 🌙"
         )
         return False, msg
     return True, None
@@ -252,27 +252,28 @@ def reset_monthly_subscription():
             }).eq("line_user_id", uid).execute()
             push_text(uid,
                 "🌙 您的月訂閱已到期，已自動切換回免費方案。\n\n"
-                "輸入「星運VIP」可重新訂閱，繼續享有無限占卜 ✨"
+                "輸入「星運VIP」可重新訂閱，繼續享有每月 15 次靈性占卜額度 ✨"
             )
             continue
         last_reset = user.get("subscription_reset_date")
         if last_reset and str(last_reset)[:7] == str(today)[:7]:
             continue
         supabase.table("users").update({
-            "tokens": 20,
+            "tokens": 15,
             "free_readings_used": 0,
             "subscription_reset_date": str(today)
         }).eq("line_user_id", uid).execute()
         supabase.table("token_logs").insert({
             "line_user_id": uid,
-            "change": 20,
+            "change": 15,
             "reason": "月訂閱每月重置"
         }).execute()
         push_text(uid,
             f"🎉 您的月訂閱已於 {today} 自動重置！\n\n"
-            "💎 本月占卜額度：20 次\n"
-            "✨ 免費占卜次數已歸零重新計算\n\n"
-            "老師已準備好，隨時為您指引星途 🌟"
+            "💎 本月靈性占卜額度：15 次\n"
+            "✨ 免費占卜次數已歸零重新計算\n"
+            "🌟 星力源源不絕，命運之輪再次轉動！\n\n"
+            "老師已準備好，隨時為您指引星途 🔮"
         )
     print(f"[月訂閱重置] 執行完畢：{today}")
 
@@ -550,8 +551,8 @@ def build_type_select_flex(mode="daily"):
 def build_token_flex(tokens, used, subscription_type="free"):
     remaining = max(0, FREE_READING_LIMIT - used)
     is_monthly = subscription_type == "monthly"
-    sub_status_text = "👑 月訂閱・星運令（每月重置 20 次）" if is_monthly else "🆓 免費方案（每週 5 次）"
-    remaining_text = "無限制 ♾️" if is_monthly else f"{remaining} / {FREE_READING_LIMIT}"
+    sub_status_text = "👑 月訂閱・星運令（每月重置 15 次）" if is_monthly else "🆓 免費方案（每月 3 次）"
+    remaining_text = "15 次額度 ♾️" if is_monthly else f"{remaining} / {FREE_READING_LIMIT}"
     flex_content = {
         "type": "bubble",
         "styles": {
@@ -584,7 +585,7 @@ def build_token_flex(tokens, used, subscription_type="free"):
                 {
                     "type": "box", "layout": "horizontal",
                     "contents": [
-                        {"type": "text", "text": "免費占卜剩餘", "color": "#666666", "size": "sm", "flex": 2},
+                        {"type": "text", "text": "靈性占卜剩餘", "color": "#666666", "size": "sm", "flex": 2},
                         {"type": "text", "text": remaining_text, "color": "#6B4FA0", "weight": "bold", "size": "sm", "flex": 1, "align": "end"}
                     ]
                 },
@@ -592,6 +593,7 @@ def build_token_flex(tokens, used, subscription_type="free"):
                 {"type": "text", "text": "每月自動補充 1 枚代幣 🌙", "color": "#AAAAAA", "size": "xs"},
                 {"type": "text", "text": "每週連續簽到 7 天送 1 枚 📅", "color": "#AAAAAA", "size": "xs"},
                 {"type": "text", "text": "推薦好友滿 3 或 5 人送 1 枚 👥", "color": "#AAAAAA", "size": "xs"},
+                {"type": "text", "text": "VIP 月訂閱每月重置 15 次額度 ✨", "color": "#AAAAAA", "size": "xs"},
             ]
         },
         "footer": {
@@ -666,23 +668,27 @@ def build_vip_flex(referral_code=""):
             "type": "box", "layout": "vertical", "spacing": "sm",
             "contents": [
                 {"type": "text", "text": "✨ VIP 專屬權益", "weight": "bold", "color": "#7B3F00", "size": "sm"},
-                {"type": "text", "text": "• 無限次免費占卜", "color": "#555555", "size": "sm"},
+                {"type": "text", "text": "• 每月 15 次靈性占卜額度", "color": "#555555", "size": "sm"},
                 {"type": "text", "text": "• 每日專屬星座深度解析", "color": "#555555", "size": "sm"},
-                {"type": "text", "text": "• 急救占卜無限使用", "color": "#555555", "size": "sm"},
                 {"type": "text", "text": "• 親友擴充槽（最多 3 位）", "color": "#555555", "size": "sm"},
                 {"type": "text", "text": "• 每月專屬星象指南", "color": "#555555", "size": "sm"},
                 {"type": "text", "text": "• 🛍️ 專屬高階幸運物 9 折優惠", "color": "#B8860B", "size": "sm", "weight": "bold"},
+                {"type": "text", "text": "• ⭐ 星力源源不絕，月月重啟命運之輪", "color": "#B8860B", "size": "sm", "weight": "bold"},
                 {"type": "separator"},
-                {"type": "text", "text": "💳 方案選擇", "weight": "bold", "color": "#7B3F00", "size": "sm"},
+                {"type": "text", "text": "💳 訂閱方案", "weight": "bold", "color": "#7B3F00", "size": "sm"},
                 {"type": "text", "text": "👑 月訂閱・星運令　NT$300／月", "color": "#555555", "size": "sm"},
-                {"type": "text", "text": "   每月1號自動重置 15～20 次占卜", "color": "#AAAAAA", "size": "xs"},
-                {"type": "text", "text": "🔮 單次急救占卜　NT$1,200", "color": "#555555", "size": "sm"},
-                {"type": "text", "text": "   1 次深度解析，高品質稀缺體驗", "color": "#AAAAAA", "size": "xs"},
+                {"type": "text", "text": "   每月1號自動重置 15 次靈性占卜額度", "color": "#AAAAAA", "size": "xs"},
+                {"type": "separator"},
+                {"type": "text", "text": "🔮 急救占卜　NT$1,200", "weight": "bold", "color": "#7B3F00", "size": "sm"},
+                {"type": "text", "text": "   感情、工作、人生卡關？讓星盤給你答案", "color": "#555555", "size": "xs"},
                 {"type": "separator"},
                 {"type": "text", "text": "✨ 代幣包方案", "weight": "bold", "color": "#7B3F00", "size": "sm"},
-                {"type": "text", "text": "⭐ 星塵包 S　$350 → 5 次（$70/次）", "color": "#555555", "size": "xs"},
-                {"type": "text", "text": "💫 星河包 M　$600 → 10 次（$60/次）", "color": "#555555", "size": "xs"},
-                {"type": "text", "text": "🌌 命運天書卷 L　$1,000 → 18 次（$55/次）", "color": "#B8860B", "size": "xs", "weight": "bold"},
+                {"type": "text", "text": "🌱 入門包　$500 → 3 次", "color": "#555555", "size": "xs"},
+                {"type": "text", "text": "   第一步踏入星盤，命運從這裡開始轉動", "color": "#AAAAAA", "size": "xs"},
+                {"type": "text", "text": "💫 超值包　$1,200 → 8 次", "color": "#555555", "size": "xs"},
+                {"type": "text", "text": "   最受歡迎！平均每次只要 $150，星辰常伴左右", "color": "#AAAAAA", "size": "xs"},
+                {"type": "text", "text": "🌌 豪華包　$2,000 → 15 次", "color": "#B8860B", "size": "xs", "weight": "bold"},
+                {"type": "text", "text": "   深度陪伴，讓老師全年守護你的每個轉折", "color": "#AAAAAA", "size": "xs"},
                 {"type": "separator"},
                 {"type": "text", "text": "👥 推薦好友加入", "weight": "bold", "color": "#7B3F00", "size": "sm"},
                 {"type": "text", "text": f"您的專屬推薦碼：{referral_code}", "color": "#555555", "size": "sm"},
@@ -949,7 +955,7 @@ def handle_message(event):
                         messages=[TextMessage(text=quota_msg)]
                     ))
                 return
-            if reading_type == "tarot":
+                        if reading_type == "tarot":
                 wait_msg = random.choice(WAITING_MSGS_TAROT)
             elif reading_type == "bazi":
                 wait_msg = random.choice(WAITING_MSGS_BAZI)
@@ -1141,7 +1147,7 @@ def handle_message(event):
             f"💎 代幣餘額：{fd.get('tokens', 0)} 枚\n"
             f"🎂 綁定生辰：{birth}（{locked_text}）\n"
             f"⭐ 星座：{zodiac_text}\n"
-            f"🆓 免費占卜剩餘：{remaining} / {FREE_READING_LIMIT} 次\n"
+            f"🌙 靈性占卜剩餘：{remaining} / {FREE_READING_LIMIT} 次\n"
             f"📅 訂閱到期日：{expires}"
         )
         with ApiClient(configuration) as api_client:
@@ -1207,7 +1213,7 @@ def handle_message(event):
         reply_text = (
             "🔮 星運導航使用說明\n\n"
             "🌙 今日運勢 → 塔羅／八字／易經每日解讀\n"
-            "🆘 急救占卜 → 深度解牌（消耗代幣）\n"
+            "🆘 急救占卜 → 感情、工作、人生卡關？讓星盤給你答案（NT$1,200）\n"
             "💎 我的代幣 → 查詢餘額與儲值\n"
             "📖 專屬天書 → 合盤／流年／紫微斗數\n"
             "👑 星運VIP → 查看訂閱方案\n"
@@ -1331,3 +1337,4 @@ def handle_postback(event):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
