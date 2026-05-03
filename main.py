@@ -130,7 +130,10 @@ def get_or_create_user(line_user_id):
             "birthdate_locked": False,
             "free_readings_used": 0,
             "referral_code": ref_code,
-            "referral_count": 0
+            "referral_count": 0,
+            "subscription_type": "free",
+            "subscription_reset_date": None,
+            "subscription_expires_at": None
         }).execute()
         supabase.table("token_logs").insert({
             "line_user_id": line_user_id,
@@ -146,7 +149,10 @@ def get_or_create_user(line_user_id):
             "birthdate_locked": False,
             "free_readings_used": 0,
             "referral_code": ref_code,
-            "referral_count": 0
+            "referral_count": 0,
+            "subscription_type": "free",
+            "subscription_reset_date": None,
+            "subscription_expires_at": None
         }
     return result.data[0]
 
@@ -168,7 +174,9 @@ def use_token(line_user_id):
 
 def check_free_reading_quota(line_user_id, user):
     plan = user.get("plan", "free")
-    if plan == "vip":
+    sub_type = user.get("subscription_type", "free")
+    # VIP 或月訂閱用戶不受免費次數限制
+    if plan == "vip" or sub_type == "monthly":
         return True, None
     result = supabase.table("users").select("free_readings_used").eq("line_user_id", line_user_id).execute()
     used = 0
@@ -187,7 +195,8 @@ def check_free_reading_quota(line_user_id, user):
 
 
 def increment_free_reading(line_user_id, user):
-    if user.get("plan", "free") == "vip":
+    sub_type = user.get("subscription_type", "free")
+    if user.get("plan", "free") == "vip" or sub_type == "monthly":
         return
     supabase.rpc("increment_free_readings", {"uid": line_user_id}).execute()
 
@@ -214,6 +223,77 @@ def push_text(line_user_id, text):
             )
     except Exception as e:
         print(f"[push_text 錯誤] {line_user_id}: {e}")
+
+
+# ══════════════════════════════════════════
+#  月訂閱重置（每月1號）
+# ══════════════════════════════════════════
+
+def reset_monthly_subscription():
+    """每月1號自動重置月訂閱用戶的代幣額度"""
+    tz = pytz.timezone("Asia/Taipei")
+    today = datetime.datetime.now(tz).date()
+
+    if today.day != 1:
+        return
+
+    print(f"[月訂閱重置] 開始執行：{today}")
+
+    try:
+        users = supabase.table("users") \
+            .select("line_user_id, tokens, subscription_reset_date, subscription_expires_at") \
+            .eq("subscription_type", "monthly") \
+            .execute().data or []
+    except Exception as e:
+        print(f"[月訂閱重置] 取得用戶失敗：{e}")
+        return
+
+    for user in users:
+        uid = user["line_user_id"]
+
+        # 檢查訂閱是否已過期
+        expires_at = user.get("subscription_expires_at")
+        if expires_at and str(expires_at) < str(today):
+            # 訂閱已過期，降回免費方案
+            supabase.table("users").update({
+                "subscription_type": "free",
+                "plan": "free"
+            }).eq("line_user_id", uid).execute()
+            push_text(uid,
+                "🌙 您的月訂閱已到期，已自動切換回免費方案。\n\n"
+                "輸入「星運VIP」可重新訂閱，繼續享有無限占卜 ✨"
+            )
+            print(f"[月訂閱重置] 訂閱過期，降級：{uid}")
+            continue
+
+        # 避免同月重複重置
+        last_reset = user.get("subscription_reset_date")
+        if last_reset and str(last_reset)[:7] == str(today)[:7]:
+            print(f"[月訂閱重置] 本月已重置，跳過：{uid}")
+            continue
+
+        # 重置代幣為 20 枚，並重置免費占卜次數
+        supabase.table("users").update({
+            "tokens": 20,
+            "free_readings_used": 0,
+            "subscription_reset_date": str(today)
+        }).eq("line_user_id", uid).execute()
+
+        supabase.table("token_logs").insert({
+            "line_user_id": uid,
+            "change": 20,
+            "reason": "月訂閱每月重置"
+        }).execute()
+
+        push_text(uid,
+            f"🎉 您的月訂閱已於 {today} 自動重置！\n\n"
+            "💎 本月占卜額度：20 次\n"
+            "✨ 免費占卜次數已歸零重新計算\n\n"
+            "老師已準備好，隨時為您指引星途 🌟"
+        )
+        print(f"[月訂閱重置] 重置成功：{uid}")
+
+    print(f"[月訂閱重置] 執行完畢：{today}")
 
 
 # ══════════════════════════════════════════
@@ -458,8 +538,9 @@ def do_daily_push():
 
 scheduler = BackgroundScheduler(timezone="Asia/Taipei")
 scheduler.add_job(do_daily_push, CronTrigger(hour=8, minute=0, timezone="Asia/Taipei"))
+scheduler.add_job(reset_monthly_subscription, CronTrigger(day=1, hour=0, minute=5, timezone="Asia/Taipei"))
 scheduler.start()
-print("[排程] APScheduler 已啟動，每日 08:00 推播")
+print("[排程] APScheduler 已啟動，每日 08:00 推播，每月1號 00:05 重置訂閱")
 
 pending_state = {}
 
@@ -506,8 +587,13 @@ def build_type_select_flex(mode="daily"):
     return FlexMessage(alt_text="請選擇占卜方式", contents=FlexContainer.from_dict(flex_content))
 
 
-def build_token_flex(tokens, used):
+def build_token_flex(tokens, used, subscription_type="free"):
     remaining = max(0, FREE_READING_LIMIT - used)
+    is_monthly = subscription_type == "monthly"
+
+    sub_status_text = "👑 月訂閱・星運令（每月重置 20 次）" if is_monthly else "🆓 免費方案（每週 5 次）"
+    remaining_text = "無限制 ♾️" if is_monthly else f"{remaining} / {FREE_READING_LIMIT}"
+
     flex_content = {
         "type": "bubble",
         "styles": {
@@ -526,6 +612,13 @@ def build_token_flex(tokens, used):
                 {
                     "type": "box", "layout": "horizontal",
                     "contents": [
+                        {"type": "text", "text": "目前方案", "color": "#666666", "size": "sm", "flex": 2},
+                        {"type": "text", "text": sub_status_text, "color": "#6B4FA0", "weight": "bold", "size": "xs", "flex": 3, "align": "end", "wrap": True}
+                    ]
+                },
+                {
+                    "type": "box", "layout": "horizontal",
+                    "contents": [
                         {"type": "text", "text": "急救代幣", "color": "#666666", "size": "sm", "flex": 2},
                         {"type": "text", "text": f"{tokens} 枚", "color": "#6B4FA0", "weight": "bold", "size": "sm", "flex": 1, "align": "end"}
                     ]
@@ -534,7 +627,7 @@ def build_token_flex(tokens, used):
                     "type": "box", "layout": "horizontal",
                     "contents": [
                         {"type": "text", "text": "免費占卜剩餘", "color": "#666666", "size": "sm", "flex": 2},
-                        {"type": "text", "text": f"{remaining} / {FREE_READING_LIMIT}", "color": "#6B4FA0", "weight": "bold", "size": "sm", "flex": 1, "align": "end"}
+                        {"type": "text", "text": remaining_text, "color": "#6B4FA0", "weight": "bold", "size": "sm", "flex": 1, "align": "end"}
                     ]
                 },
                 {"type": "separator"},
@@ -622,7 +715,16 @@ def build_vip_flex(referral_code=""):
                 {"type": "text", "text": "• 每月專屬星象指南", "color": "#555555", "size": "sm"},
                 {"type": "text", "text": "• 🛍️ 專屬高階幸運物 9 折優惠", "color": "#B8860B", "size": "sm", "weight": "bold"},
                 {"type": "separator"},
-                {"type": "text", "text": "月訂閱 NT$199 / 單次 NT$99", "color": "#7B3F00", "weight": "bold", "size": "sm"},
+                {"type": "text", "text": "💳 方案選擇", "weight": "bold", "color": "#7B3F00", "size": "sm"},
+                {"type": "text", "text": "👑 月訂閱・星運令　NT$300／月", "color": "#555555", "size": "sm"},
+                {"type": "text", "text": "   每月1號自動重置 15～20 次占卜", "color": "#AAAAAA", "size": "xs"},
+                {"type": "text", "text": "🔮 單次急救占卜　NT$1,200", "color": "#555555", "size": "sm"},
+                {"type": "text", "text": "   1 次深度解析，高品質稀缺體驗", "color": "#AAAAAA", "size": "xs"},
+                {"type": "separator"},
+                {"type": "text", "text": "✨ 代幣包方案", "weight": "bold", "color": "#7B3F00", "size": "sm"},
+                {"type": "text", "text": "⭐ 星塵包 S　$350 → 5 次（$70/次）", "color": "#555555", "size": "xs"},
+                {"type": "text", "text": "💫 星河包 M　$600 → 10 次（$60/次）", "color": "#555555", "size": "xs"},
+                {"type": "text", "text": "🌌 命運天書卷 L　$1,000 → 18 次（$55/次）", "color": "#B8860B", "size": "xs", "weight": "bold"},
                 {"type": "separator"},
                 {"type": "text", "text": "👥 推薦好友加入", "weight": "bold", "color": "#7B3F00", "size": "sm"},
                 {"type": "text", "text": f"您的專屬推薦碼：{referral_code}", "color": "#555555", "size": "sm"},
@@ -797,6 +899,13 @@ def push_now():
     return "推播已觸發", 200
 
 
+@app.route("/reset-subscriptions", methods=["GET"])
+def trigger_reset():
+    """手動觸發月訂閱重置（測試用）"""
+    reset_monthly_subscription()
+    return "月訂閱重置已觸發", 200
+
+
 @app.route("/callback", methods=["POST"])
 def callback():
     signature = request.headers["X-Line-Signature"]
@@ -857,6 +966,9 @@ def handle_message(event):
     if user.get("birthdate_locked") is None:
         needs_update["birthdate_locked"] = False
         user["birthdate_locked"] = False
+    if user.get("subscription_type") is None:
+        needs_update["subscription_type"] = "free"
+        user["subscription_type"] = "free"
     if needs_update:
         supabase.table("users").update(needs_update).eq("line_user_id", line_user_id).execute()
 
@@ -878,7 +990,7 @@ def handle_message(event):
                 return
             wait_msg = random.choice(WAITING_MSGS_DEEP)
         else:
-            can_read, quota_msg = check_free_reading_quota(line_user_id, user)
+                        can_read, quota_msg = check_free_reading_quota(line_user_id, user)
             if not can_read:
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(ReplyMessageRequest(
@@ -927,12 +1039,16 @@ def handle_message(event):
         return
 
     elif user_msg in ["我的代幣", "代幣"]:
-        fresh = supabase.table("users").select("free_readings_used, tokens").eq("line_user_id", line_user_id).execute()
+        fresh = supabase.table("users").select("free_readings_used, tokens, subscription_type").eq("line_user_id", line_user_id).execute()
         fd = fresh.data[0] if fresh.data else {}
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
                 reply_token=event.reply_token,
-                messages=[build_token_flex(fd.get("tokens") or 0, fd.get("free_readings_used") or 0)]
+                messages=[build_token_flex(
+                    fd.get("tokens") or 0,
+                    fd.get("free_readings_used") or 0,
+                    fd.get("subscription_type") or "free"
+                )]
             ))
         return
 
@@ -1059,18 +1175,26 @@ def handle_message(event):
     elif user_msg in ["我的方案", "方案"]:
         fresh = supabase.table("users").select("*").eq("line_user_id", line_user_id).execute()
         fd = fresh.data[0] if fresh.data else {}
-        plan_name = "⭐ 星運 VIP" if fd.get("plan") == "vip" else "🆓 免費版"
+        sub_type = fd.get("subscription_type") or "free"
+        if sub_type == "monthly":
+            plan_name = "👑 月訂閱・星運令"
+        elif fd.get("plan") == "vip":
+            plan_name = "⭐ 星運 VIP"
+        else:
+            plan_name = "🆓 免費版"
         birth = fd.get("birth_date") or "尚未綁定"
         zodiac_text = get_zodiac(birth) if fd.get("birth_date") else "尚未綁定生辰"
         locked_text = "🔒 已鎖定" if fd.get("birthdate_locked") else "🔓 未鎖定"
         used = fd.get("free_readings_used") or 0
         remaining = max(0, FREE_READING_LIMIT - used)
+        expires = fd.get("subscription_expires_at") or "—"
         reply_text = (
             f"您目前的方案是：{plan_name}\n"
             f"💎 代幣餘額：{fd.get('tokens', 0)} 枚\n"
             f"🎂 綁定生辰：{birth}（{locked_text}）\n"
             f"⭐ 星座：{zodiac_text}\n"
-            f"🆓 免費占卜剩餘：{remaining} / {FREE_READING_LIMIT} 次"
+            f"🆓 免費占卜剩餘：{remaining} / {FREE_READING_LIMIT} 次\n"
+            f"📅 訂閱到期日：{expires}"
         )
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
@@ -1115,21 +1239,19 @@ def handle_message(event):
 
     elif user_msg in ["關閉推播", "停止推播"]:
         supabase.table("users").update({"daily_push": False}).eq("line_user_id", line_user_id).execute()
-        reply_text = "已關閉每日運勢推播 🌙\n若想重新開啟，請傳送「開啟推播」"
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
                 reply_token=event.reply_token,
-                messages=[TextMessage(text=reply_text)]
+                messages=[TextMessage(text="已關閉每日運勢推播 🌙\n若想重新開啟，請傳送「開啟推播」")]
             ))
         return
 
     elif user_msg in ["開啟推播", "開啟每日推播"]:
         supabase.table("users").update({"daily_push": True}).eq("line_user_id", line_user_id).execute()
-        reply_text = "✨ 每日運勢推播已開啟！\n每天早上 8:00 老師會為您送上今日星運 🌟"
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
                 reply_token=event.reply_token,
-                messages=[TextMessage(text=reply_text)]
+                messages=[TextMessage(text="✨ 每日運勢推播已開啟！\n每天早上 8:00 老師會為您送上今日星運 🌟")]
             ))
         return
 
@@ -1269,3 +1391,4 @@ def handle_postback(event):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
