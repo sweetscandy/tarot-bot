@@ -972,7 +972,7 @@ def handle_message(event):
         return
 
     elif user_msg in ["急救占卜"]:
-                if user.get("tokens", 0) < 1:
+        if user.get("tokens", 0) < 1:
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest(
                     reply_token=event.reply_token,
@@ -1331,4 +1331,3 @@ def handle_postback(event):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
