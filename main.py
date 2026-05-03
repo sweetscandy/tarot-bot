@@ -24,7 +24,7 @@ groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 supabase = create_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_KEY"))
 
 FREE_READING_LIMIT = 5
-SHOP_URL = "https://tarot-bot-qqqg.onrender.com"  # 暫時連結
+SHOP_URL = "https://tarot-bot-qqqg.onrender.com"
 
 TAROT_CARDS = [
     "愚者", "魔術師", "女祭司", "女皇", "皇帝", "教皇", "戀人", "戰車",
@@ -554,7 +554,6 @@ def build_token_flex(tokens, used):
                     "type": "button", "style": "secondary",
                     "action": {"type": "message", "label": "📅 每日簽到", "text": "簽到"}
                 },
-                # ✅ 新增推薦碼按鈕
                 {
                     "type": "button", "style": "secondary",
                     "action": {"type": "message", "label": "📤 我的推薦碼", "text": "我的推薦碼"}
@@ -791,10 +790,12 @@ def build_daily_flex(card, orientation, reading, zodiac, today_str):
 def health_check():
     return "OK", 200
 
+
 @app.route("/push-now", methods=["GET"])
 def push_now():
     do_daily_push()
     return "推播已觸發", 200
+
 
 @app.route("/callback", methods=["POST"])
 def callback():
@@ -833,7 +834,6 @@ def handle_follow(event):
             to=line_user_id, messages=[build_date_picker_flex()]
         ))
 
-    # ✅ 推薦碼提示
     push_text(
         line_user_id,
         "🎁 如果是朋友推薦您來的\n"
@@ -862,12 +862,11 @@ def handle_message(event):
 
     zodiac = get_zodiac(user.get("birth_date")) if user.get("birth_date") else None
 
-    # ── 等待輸入問題 ──
+    # ── 等待輸入問題狀態 ──
     if line_user_id in pending_state:
         state = pending_state.pop(line_user_id)
         mode = state["mode"]
         reading_type = state["type"]
-        type_names = {"tarot": "塔羅", "bazi": "八字", "iching": "易經"}
 
         if mode == "deep":
             if not use_token(line_user_id):
@@ -966,25 +965,7 @@ def handle_message(event):
             ))
         return
 
-    elif user_msg in ["我的推薦碼", "推薦碼"]:
-        ref_code = user.get("referral_code") or "尚未產生"
-        ref_count = user.get("referral_count") or 0
-        reply_text = (
-            f"📤 您的專屬推薦碼：{ref_code}\n\n"
-            f"📊 目前推薦人數：{ref_count} 人\n\n"
-            f"🎁 推薦好友加入方式：\n"
-            f"請好友加入後傳送「推薦碼 {ref_code}」\n\n"
-            f"💎 推薦滿 3 人送 1 枚代幣\n"
-            f"💎 推薦滿 5 人再送 1 枚代幣 🌟"
-        )
-        with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(ReplyMessageRequest(
-                reply_token=event.reply_token,
-                messages=[TextMessage(text=reply_text)]
-            ))
-        return
-
-        elif user_msg.startswith("推薦碼"):
+    elif user_msg.startswith("推薦碼 "):
         parts = user_msg.split()
         if len(parts) >= 2:
             ref_code = parts[1].strip().upper()
@@ -1009,6 +990,24 @@ def handle_message(event):
                 "推薦碼 XXXXXX\n\n"
                 "（請在「推薦碼」後面加一個空格，再輸入碼）"
             )
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[TextMessage(text=reply_text)]
+            ))
+        return
+
+       elif user_msg in ["我的推薦碼", "推薦碼"]:
+        ref_code = user.get("referral_code") or "尚未產生"
+        ref_count = user.get("referral_count") or 0
+        reply_text = (
+            f"📤 您的專屬推薦碼：{ref_code}\n\n"
+            f"📊 目前推薦人數：{ref_count} 人\n\n"
+            f"🎁 推薦好友加入方式：\n"
+            f"請好友加入後傳送「推薦碼 {ref_code}」\n\n"
+            f"💎 推薦滿 3 人送 1 枚代幣\n"
+            f"💎 推薦滿 5 人再送 1 枚代幣 🌟"
+        )
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
                 reply_token=event.reply_token,
@@ -1073,6 +1072,12 @@ def handle_message(event):
             f"⭐ 星座：{zodiac_text}\n"
             f"🆓 免費占卜剩餘：{remaining} / {FREE_READING_LIMIT} 次"
         )
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[TextMessage(text=reply_text)]
+            ))
+        return
 
     elif user_msg in ["我的紀錄", "占卜紀錄", "紀錄"]:
         logs = supabase.table("tarot_logs") \
@@ -1081,11 +1086,10 @@ def handle_message(event):
             .order("created_at", desc=True) \
             .limit(5).execute()
         if not logs.data:
-            reply_text = "您還沒有任何占卜紀錄喔 🌙\n傳訊息給老師，讓塔羅牌為您指引方向吧 🃏"
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[TextMessage(text=reply_text)]
+                    messages=[TextMessage(text="您還沒有任何占卜紀錄喔 🌙\n傳訊息給老師，讓塔羅牌為您指引方向吧 🃏")]
                 ))
             return
         with ApiClient(configuration) as api_client:
@@ -1102,14 +1106,32 @@ def handle_message(event):
             "傳送「關閉推播」→ 停止每日推播\n"
             "傳送「開啟推播」→ 重新開啟每日推播"
         )
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[TextMessage(text=reply_text)]
+            ))
+        return
 
     elif user_msg in ["關閉推播", "停止推播"]:
         supabase.table("users").update({"daily_push": False}).eq("line_user_id", line_user_id).execute()
         reply_text = "已關閉每日運勢推播 🌙\n若想重新開啟，請傳送「開啟推播」"
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[TextMessage(text=reply_text)]
+            ))
+        return
 
     elif user_msg in ["開啟推播", "開啟每日推播"]:
         supabase.table("users").update({"daily_push": True}).eq("line_user_id", line_user_id).execute()
         reply_text = "✨ 每日運勢推播已開啟！\n每天早上 8:00 老師會為您送上今日星運 🌟"
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[TextMessage(text=reply_text)]
+            ))
+        return
 
     elif user_msg in ["說明", "使用說明", "help", "Help"]:
         reply_text = (
@@ -1126,6 +1148,12 @@ def handle_message(event):
             "💡 若老師沒有立即回應，\n"
             "請稍等約 30 秒後再傳訊息 ✨"
         )
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[TextMessage(text=reply_text)]
+            ))
+        return
 
     else:
         # 一般訊息 → 預設塔羅占卜
@@ -1137,7 +1165,6 @@ def handle_message(event):
                     messages=[TextMessage(text=quota_msg)]
                 ))
             return
-
         wait_msg = random.choice(WAITING_MSGS_TAROT)
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
@@ -1147,12 +1174,6 @@ def handle_message(event):
         do_reading_async(line_user_id, user_msg, "tarot", False, zodiac, user)
         return
 
-    with ApiClient(configuration) as api_client:
-        MessagingApi(api_client).reply_message(ReplyMessageRequest(
-            reply_token=event.reply_token,
-            messages=[TextMessage(text=reply_text)]
-        ))
-
 
 @handler.add(PostbackEvent)
 def handle_postback(event):
@@ -1160,12 +1181,12 @@ def handle_postback(event):
     data = event.postback.data
 
     type_map = {
-        "daily_tarot": ("daily", "tarot"),
-        "daily_bazi":  ("daily", "bazi"),
+        "daily_tarot":  ("daily", "tarot"),
+        "daily_bazi":   ("daily", "bazi"),
         "daily_iching": ("daily", "iching"),
-        "deep_tarot":  ("deep", "tarot"),
-        "deep_bazi":   ("deep", "bazi"),
-        "deep_iching": ("deep", "iching"),
+        "deep_tarot":   ("deep", "tarot"),
+        "deep_bazi":    ("deep", "bazi"),
+        "deep_iching":  ("deep", "iching"),
     }
 
     if data in type_map:
@@ -1248,3 +1269,4 @@ def handle_postback(event):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
