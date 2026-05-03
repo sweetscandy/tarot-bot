@@ -997,7 +997,7 @@ def handle_message(event):
             ))
         return
 
-       elif user_msg in ["我的推薦碼", "推薦碼"]:
+    elif user_msg in ["我的推薦碼", "推薦碼"]:
         ref_code = user.get("referral_code") or "尚未產生"
         ref_count = user.get("referral_count") or 0
         reply_text = (
@@ -1269,4 +1269,3 @@ def handle_postback(event):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
