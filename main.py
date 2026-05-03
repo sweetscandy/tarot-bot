@@ -989,8 +989,8 @@ def handle_message(event):
                     ))
                 return
             wait_msg = random.choice(WAITING_MSGS_DEEP)
-        else:
-                        can_read, quota_msg = check_free_reading_quota(line_user_id, user)
+               else:
+            can_read, quota_msg = check_free_reading_quota(line_user_id, user)
             if not can_read:
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(ReplyMessageRequest(
@@ -1012,6 +1012,7 @@ def handle_message(event):
             ))
         do_reading_async(line_user_id, user_msg, reading_type, mode == "deep", zodiac, user)
         return
+
 
     # ── 指令路由 ──
 
