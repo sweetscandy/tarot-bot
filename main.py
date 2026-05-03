@@ -955,7 +955,7 @@ def handle_message(event):
                         messages=[TextMessage(text=quota_msg)]
                     ))
                 return
-                        if reading_type == "tarot":
+            if reading_type == "tarot":
                 wait_msg = random.choice(WAITING_MSGS_TAROT)
             elif reading_type == "bazi":
                 wait_msg = random.choice(WAITING_MSGS_BAZI)
