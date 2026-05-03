@@ -175,7 +175,6 @@ def use_token(line_user_id):
 def check_free_reading_quota(line_user_id, user):
     plan = user.get("plan", "free")
     sub_type = user.get("subscription_type", "free")
-    # VIP 或月訂閱用戶不受免費次數限制
     if plan == "vip" or sub_type == "monthly":
         return True, None
     result = supabase.table("users").select("free_readings_used").eq("line_user_id", line_user_id).execute()
@@ -230,15 +229,11 @@ def push_text(line_user_id, text):
 # ══════════════════════════════════════════
 
 def reset_monthly_subscription():
-    """每月1號自動重置月訂閱用戶的代幣額度"""
     tz = pytz.timezone("Asia/Taipei")
     today = datetime.datetime.now(tz).date()
-
     if today.day != 1:
         return
-
     print(f"[月訂閱重置] 開始執行：{today}")
-
     try:
         users = supabase.table("users") \
             .select("line_user_id, tokens, subscription_reset_date, subscription_expires_at") \
@@ -247,14 +242,10 @@ def reset_monthly_subscription():
     except Exception as e:
         print(f"[月訂閱重置] 取得用戶失敗：{e}")
         return
-
     for user in users:
         uid = user["line_user_id"]
-
-        # 檢查訂閱是否已過期
         expires_at = user.get("subscription_expires_at")
         if expires_at and str(expires_at) < str(today):
-            # 訂閱已過期，降回免費方案
             supabase.table("users").update({
                 "subscription_type": "free",
                 "plan": "free"
@@ -263,36 +254,26 @@ def reset_monthly_subscription():
                 "🌙 您的月訂閱已到期，已自動切換回免費方案。\n\n"
                 "輸入「星運VIP」可重新訂閱，繼續享有無限占卜 ✨"
             )
-            print(f"[月訂閱重置] 訂閱過期，降級：{uid}")
             continue
-
-        # 避免同月重複重置
         last_reset = user.get("subscription_reset_date")
         if last_reset and str(last_reset)[:7] == str(today)[:7]:
-            print(f"[月訂閱重置] 本月已重置，跳過：{uid}")
             continue
-
-        # 重置代幣為 20 枚，並重置免費占卜次數
         supabase.table("users").update({
             "tokens": 20,
             "free_readings_used": 0,
             "subscription_reset_date": str(today)
         }).eq("line_user_id", uid).execute()
-
         supabase.table("token_logs").insert({
             "line_user_id": uid,
             "change": 20,
             "reason": "月訂閱每月重置"
         }).execute()
-
         push_text(uid,
             f"🎉 您的月訂閱已於 {today} 自動重置！\n\n"
             "💎 本月占卜額度：20 次\n"
             "✨ 免費占卜次數已歸零重新計算\n\n"
             "老師已準備好，隨時為您指引星途 🌟"
         )
-        print(f"[月訂閱重置] 重置成功：{uid}")
-
     print(f"[月訂閱重置] 執行完畢：{today}")
 
 
@@ -308,7 +289,6 @@ def do_checkin(line_user_id):
     tz = pytz.timezone("Asia/Taipei")
     today = datetime.datetime.now(tz).date()
     week_start = get_week_start(today)
-
     already = supabase.table("checkin_logs") \
         .select("id") \
         .eq("line_user_id", line_user_id) \
@@ -316,20 +296,17 @@ def do_checkin(line_user_id):
         .execute()
     if already.data:
         return False, "already_today"
-
     week_logs = supabase.table("checkin_logs") \
         .select("checkin_date") \
         .eq("line_user_id", line_user_id) \
         .eq("week_start", week_start.isoformat()) \
         .execute()
     checkin_days = len(week_logs.data) if week_logs.data else 0
-
     supabase.table("checkin_logs").insert({
         "line_user_id": line_user_id,
         "checkin_date": today.isoformat(),
         "week_start": week_start.isoformat()
     }).execute()
-
     checkin_days += 1
     reward = False
     if today.weekday() == 6 and checkin_days == 7:
@@ -343,7 +320,6 @@ def do_checkin(line_user_id):
             "reason": "每週連續簽到獎勵"
         }).execute()
         reward = True
-
     return True, {"days": checkin_days, "week_start": week_start, "reward": reward}
 
 
@@ -361,16 +337,13 @@ def process_referral(new_user_id, ref_code):
     referrer_id = referrer_data["line_user_id"]
     if referrer_id == new_user_id:
         return
-
     supabase.table("users").update(
         {"referred_by": referrer_id}
     ).eq("line_user_id", new_user_id).execute()
-
     new_count = (referrer_data.get("referral_count") or 0) + 1
     supabase.table("users").update(
         {"referral_count": new_count}
     ).eq("line_user_id", referrer_id).execute()
-
     if new_count in [3, 5]:
         supabase.table("users").update(
             {"tokens": referrer_data["tokens"] + 1}
@@ -403,7 +376,6 @@ def _run_reading_background(line_user_id, user_msg, reading_type, is_deep, zodia
     try:
         card_drawn = ""
         type_label = ""
-
         if reading_type == "tarot":
             card = random.choice(TAROT_CARDS)
             orientation = "逆位" if random.choice([True, False]) else "正位"
@@ -414,7 +386,6 @@ def _run_reading_background(line_user_id, user_msg, reading_type, is_deep, zodia
             user_prompt = f"""{zodiac_hint}用戶的問題是：「{user_msg}」
 抽到的牌是：{card_drawn}
 {depth_hint}"""
-
         elif reading_type == "bazi":
             type_label = "八字"
             birth = user.get("birth_date", "未知")
@@ -423,7 +394,6 @@ def _run_reading_background(line_user_id, user_msg, reading_type, is_deep, zodia
             user_prompt = f"""{zodiac_hint}使用者生辰：{birth}
 用戶的問題是：「{user_msg}」
 請以八字命理角度，{depth_hint}"""
-
         elif reading_type == "iching":
             hexagram = random.choice(ICHING_HEXAGRAMS)
             card_drawn = hexagram
@@ -434,7 +404,6 @@ def _run_reading_background(line_user_id, user_msg, reading_type, is_deep, zodia
 {depth_hint}"""
         else:
             return
-
         chat_completion = groq_client.chat.completions.create(
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -443,7 +412,6 @@ def _run_reading_background(line_user_id, user_msg, reading_type, is_deep, zodia
             model="llama-3.3-70b-versatile",
         )
         response_text = chat_completion.choices[0].message.content
-
         category = f"急救占卜｜{type_label}" if is_deep else f"一般占卜｜{type_label}"
         try:
             supabase.table("tarot_logs").insert({
@@ -455,21 +423,17 @@ def _run_reading_background(line_user_id, user_msg, reading_type, is_deep, zodia
             }).execute()
         except Exception as e:
             print(f"tarot_logs 寫入錯誤: {e}")
-
         if not is_deep and user:
             increment_free_reading(line_user_id, user)
-
         if reading_type == "tarot":
             prefix = f"🆘 急救占卜｜塔羅深度解牌\n\n🃏 老師為您抽到了【{card_drawn}】\n\n" if is_deep else f"🃏 老師為您抽到了【{card_drawn}】\n\n"
         elif reading_type == "bazi":
             prefix = "🆘 急救占卜｜八字深度解析\n\n" if is_deep else "🀄 八字運勢解讀\n\n"
         elif reading_type == "iching":
             prefix = f"🆘 急救占卜｜易經深度解卦\n\n☯️ 老師為您起卦得【{card_drawn}】\n\n" if is_deep else f"☯️ 老師為您起卦得【{card_drawn}】\n\n"
-
         footer = get_lucky_item_text()
         final_text = prefix + response_text + footer
         push_text(line_user_id, final_text)
-
     except Exception as e:
         print(f"[背景占卜錯誤] {line_user_id}: {e}")
         push_text(line_user_id, "✨ 星辰訊號有些微干擾，請再傳一次訊息給老師 🙏")
@@ -492,14 +456,12 @@ def do_daily_push():
     print(f"[排程] 每日推播啟動：{datetime.datetime.now()}")
     tz = pytz.timezone("Asia/Taipei")
     today_str = datetime.datetime.now(tz).strftime("%Y年%m月%d日")
-
     try:
         result = supabase.table("users").select("line_user_id, birth_date, daily_push").execute()
         users = result.data or []
     except Exception as e:
         print(f"[排程] 取得用戶失敗：{e}")
         return
-
     for user in users:
         if not user.get("daily_push", True):
             continue
@@ -510,7 +472,6 @@ def do_daily_push():
         zodiac_hint = f"使用者的星座是【{zodiac}】，請融入星座特質。\n" if zodiac else ""
         prompt = f"""{zodiac_hint}今天是 {today_str}，請為使用者抽出今日牌卡【{card}｜{orientation}】，
 給出約100字的每日運勢提醒，語氣溫柔簡短，像老師給學生的早安叮嚀。"""
-
         try:
             chat_completion = groq_client.chat.completions.create(
                 messages=[
@@ -558,7 +519,6 @@ def build_type_select_flex(mode="daily"):
         title = "🆘 急救占卜"
         desc = "心煩卡關的時候\n選擇您信任的占卜方式 🔮"
         tarot_data, bazi_data, iching_data = "deep_tarot", "deep_bazi", "deep_iching"
-
     flex_content = {
         "type": "bubble",
         "styles": {
@@ -590,10 +550,8 @@ def build_type_select_flex(mode="daily"):
 def build_token_flex(tokens, used, subscription_type="free"):
     remaining = max(0, FREE_READING_LIMIT - used)
     is_monthly = subscription_type == "monthly"
-
     sub_status_text = "👑 月訂閱・星運令（每月重置 20 次）" if is_monthly else "🆓 免費方案（每週 5 次）"
     remaining_text = "無限制 ♾️" if is_monthly else f"{remaining} / {FREE_READING_LIMIT}"
-
     flex_content = {
         "type": "bubble",
         "styles": {
@@ -901,7 +859,6 @@ def push_now():
 
 @app.route("/reset-subscriptions", methods=["GET"])
 def trigger_reset():
-    """手動觸發月訂閱重置（測試用）"""
     reset_monthly_subscription()
     return "月訂閱重置已觸發", 200
 
@@ -921,7 +878,6 @@ def callback():
 def handle_follow(event):
     line_user_id = event.source.user_id
     get_or_create_user(line_user_id)
-
     welcome_text = (
         "嗨，終於等到您了 🌙\n"
         "我是您的專屬『心靈星運導航老師』。\n"
@@ -933,7 +889,6 @@ def handle_follow(event):
         "請稍等約 30 秒後再傳訊息，\n"
         "那是星辰正在為您凝聚能量 ✨"
     )
-
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
         line_bot_api.push_message(PushMessageRequest(
@@ -942,7 +897,6 @@ def handle_follow(event):
         line_bot_api.push_message(PushMessageRequest(
             to=line_user_id, messages=[build_date_picker_flex()]
         ))
-
     push_text(
         line_user_id,
         "🎁 如果是朋友推薦您來的\n"
@@ -958,7 +912,6 @@ def handle_message(event):
     user_msg = event.message.text.strip()
     user = get_or_create_user(line_user_id)
 
-    # 防呆補 NULL
     needs_update = {}
     if user.get("free_readings_used") is None:
         needs_update["free_readings_used"] = 0
@@ -974,12 +927,10 @@ def handle_message(event):
 
     zodiac = get_zodiac(user.get("birth_date")) if user.get("birth_date") else None
 
-    # ── 等待輸入問題狀態 ──
     if line_user_id in pending_state:
         state = pending_state.pop(line_user_id)
         mode = state["mode"]
         reading_type = state["type"]
-
         if mode == "deep":
             if not use_token(line_user_id):
                 with ApiClient(configuration) as api_client:
@@ -989,7 +940,7 @@ def handle_message(event):
                     ))
                 return
             wait_msg = random.choice(WAITING_MSGS_DEEP)
-               else:
+        else:
             can_read, quota_msg = check_free_reading_quota(line_user_id, user)
             if not can_read:
                 with ApiClient(configuration) as api_client:
@@ -1004,7 +955,6 @@ def handle_message(event):
                 wait_msg = random.choice(WAITING_MSGS_BAZI)
             else:
                 wait_msg = random.choice(WAITING_MSGS_ICHING)
-
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
                 reply_token=event.reply_token,
@@ -1012,9 +962,6 @@ def handle_message(event):
             ))
         do_reading_async(line_user_id, user_msg, reading_type, mode == "deep", zodiac, user)
         return
-
-
-    # ── 指令路由 ──
 
     if user_msg in ["今日運勢", "運勢"]:
         with ApiClient(configuration) as api_client:
@@ -1025,7 +972,7 @@ def handle_message(event):
         return
 
     elif user_msg in ["急救占卜"]:
-        if user.get("tokens", 0) < 1:
+                if user.get("tokens", 0) < 1:
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest(
                     reply_token=event.reply_token,
@@ -1279,7 +1226,6 @@ def handle_message(event):
         return
 
     else:
-        # 一般訊息 → 預設塔羅占卜
         can_read, quota_msg = check_free_reading_quota(line_user_id, user)
         if not can_read:
             with ApiClient(configuration) as api_client:
@@ -1316,7 +1262,6 @@ def handle_postback(event):
         mode, reading_type = type_map[data]
         type_names = {"tarot": "塔羅", "bazi": "八字", "iching": "易經"}
         type_name = type_names[reading_type]
-
         if mode == "deep":
             user = get_or_create_user(line_user_id)
             if user["tokens"] < 1:
@@ -1338,9 +1283,7 @@ def handle_postback(event):
                 f"請告訴老師您今天最想了解的方向，\n"
                 f"或直接傳送「開始」讓星辰為您指引 ✨"
             )
-
         pending_state[line_user_id] = {"mode": mode, "type": reading_type}
-
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
                 reply_token=event.reply_token,
@@ -1353,7 +1296,6 @@ def handle_postback(event):
         try:
             user = get_or_create_user(line_user_id)
             is_locked = user.get("birthdate_locked", False)
-
             if is_locked:
                 if not use_token(line_user_id):
                     with ApiClient(configuration) as api_client:
@@ -1362,12 +1304,10 @@ def handle_postback(event):
                             messages=[TextMessage(text="💎 代幣不足，無法改綁生辰。\n請先儲值代幣後再試 🌙")]
                         ))
                     return
-
             supabase.table("users").update({
                 "birth_date": date_str,
                 "birthdate_locked": True
             }).eq("line_user_id", line_user_id).execute()
-
             zodiac = get_zodiac(date_str)
             lock_hint = "（往後改綁需消耗 1 枚代幣）" if not is_locked else "（已消耗 1 枚代幣）"
             reply_text = (
@@ -1381,7 +1321,6 @@ def handle_postback(event):
         except Exception as e:
             print(f"綁定生辰錯誤: {e}")
             reply_text = "綁定時發生錯誤，請稍後再試 🙏"
-
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
                 reply_token=event.reply_token,
