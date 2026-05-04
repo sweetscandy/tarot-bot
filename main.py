@@ -331,20 +331,38 @@ def do_checkin(line_user_id):
 def process_referral(new_user_id, ref_code):
     if not ref_code:
         return
+
+    # 檢查推薦碼是否存在
     referrer = supabase.table("users").select("*").eq("referral_code", ref_code.upper()).execute()
     if not referrer.data:
         return
+
     referrer_data = referrer.data[0]
     referrer_id = referrer_data["line_user_id"]
+
+    # ✅ 不能用自己的推薦碼
     if referrer_id == new_user_id:
         return
+
+    # ✅ 已經用過推薦碼，不能再用
+    new_user = get_or_create_user(new_user_id)
+    if new_user.get("referred_by"):
+        return
+
+    # ✅ 防止互推
+    if referrer_data.get("referred_by") == new_user_id:
+        return
+
+    # 寫入推薦關係
     supabase.table("users").update(
         {"referred_by": referrer_id}
     ).eq("line_user_id", new_user_id).execute()
+
     new_count = (referrer_data.get("referral_count") or 0) + 1
     supabase.table("users").update(
         {"referral_count": new_count}
     ).eq("line_user_id", referrer_id).execute()
+
     if new_count in [3, 5]:
         supabase.table("users").update(
             {"tokens": referrer_data["tokens"] + 1}
@@ -367,6 +385,7 @@ def process_referral(new_user_id, ref_code):
             f"📊 目前推薦人數：{new_count} 人\n"
             f"💎 推薦滿 3 人或 5 人可獲得代幣獎勵 🌙"
         )
+
 
 
 # ══════════════════════════════════════════
