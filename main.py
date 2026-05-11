@@ -22,9 +22,9 @@ handler = WebhookHandler(os.environ.get("LINE_CHANNEL_SECRET"))
 groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 supabase = create_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_KEY"))
 
-RENDER_URL = os.environ.get("RENDER_URL", "https://tarot-bot-qqqg.onrender.com")
+RENDER_URL = os.environ.get("RENDER_URL", "https://tarot-bot-qqgg.onrender.com")
 FREE_READING_LIMIT = 3
-SHOP_URL = "https://tarot-bot-qqqg.onrender.com"
+SHOP_URL = "https://tarot-bot-qqgg.onrender.com"
 
 TAROT_CARDS = [
     "愚者", "魔術師", "女祭司", "女皇", "皇帝", "教皇", "戀人", "戰車",
