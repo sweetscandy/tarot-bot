@@ -515,11 +515,7 @@ def do_daily_push():
 #  排程器
 # ══════════════════════════════════════════
 
-scheduler = BackgroundScheduler(timezone="Asia/Taipei")
-scheduler.add_job(do_daily_push, CronTrigger(hour=8, minute=0, timezone="Asia/Taipei"))
-scheduler.add_job(reset_monthly_subscription, CronTrigger(day=1, hour=0, minute=5, timezone="Asia/Taipei"))
-scheduler.start()
-print("[排程] APScheduler 已啟動，每日 08:00 推播，每月1號 00:05 重置訂閱")
+
 
 pending_state = {}
 
