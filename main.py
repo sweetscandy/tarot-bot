@@ -12,7 +12,8 @@ from linebot.v3.webhooks import (
 from linebot.v3.exceptions import InvalidSignatureError
 from groq import Groq
 from supabase import create_client
-import os, random, datetime, pytz, threading
+from linepay import create_payment, confirm_payment
+import os, random, datetime, pytz, threading, uuid, asyncio
 
 app = Flask(__name__)
 
@@ -21,6 +22,7 @@ handler = WebhookHandler(os.environ.get("LINE_CHANNEL_SECRET"))
 groq_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 supabase = create_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_KEY"))
 
+RENDER_URL = os.environ.get("RENDER_URL", "https://tarot-bot-qqqg.onrender.com")
 FREE_READING_LIMIT = 3
 SHOP_URL = "https://tarot-bot-qqqg.onrender.com"
 
@@ -329,38 +331,25 @@ def do_checkin(line_user_id):
 def process_referral(new_user_id, ref_code):
     if not ref_code:
         return
-
-    # 檢查推薦碼是否存在
     referrer = supabase.table("users").select("*").eq("referral_code", ref_code.upper()).execute()
     if not referrer.data:
         return
-
     referrer_data = referrer.data[0]
     referrer_id = referrer_data["line_user_id"]
-
-    # ✅ 不能用自己的推薦碼
     if referrer_id == new_user_id:
         return
-
-    # ✅ 已經用過推薦碼，不能再用
     new_user = get_or_create_user(new_user_id)
     if new_user.get("referred_by"):
         return
-
-    # ✅ 防止互推
     if referrer_data.get("referred_by") == new_user_id:
         return
-
-    # 寫入推薦關係
     supabase.table("users").update(
         {"referred_by": referrer_id}
     ).eq("line_user_id", new_user_id).execute()
-
     new_count = (referrer_data.get("referral_count") or 0) + 1
     supabase.table("users").update(
         {"referral_count": new_count}
     ).eq("line_user_id", referrer_id).execute()
-
     if new_count in [3, 5]:
         supabase.table("users").update(
             {"tokens": referrer_data["tokens"] + 1}
@@ -383,7 +372,6 @@ def process_referral(new_user_id, ref_code):
             f"📊 目前推薦人數：{new_count} 人\n"
             f"💎 推薦滿 3 人或 5 人可獲得代幣獎勵 🌙"
         )
-
 
 
 # ══════════════════════════════════════════
@@ -514,8 +502,6 @@ def do_daily_push():
 # ══════════════════════════════════════════
 #  排程器
 # ══════════════════════════════════════════
-
-
 
 pending_state = {}
 
@@ -712,7 +698,7 @@ def build_vip_flex(referral_code=""):
             "type": "box", "layout": "vertical", "spacing": "sm",
             "contents": [
                 {"type": "button", "style": "primary", "color": "#B8860B",
-                 "action": {"type": "uri", "label": "👑 立即升級 VIP", "uri": SHOP_URL}},
+                 "action": {"type": "message", "label": "👑 月訂閱 NT$300／月", "text": "訂閱"}},
                 {"type": "button", "style": "secondary",
                  "action": {"type": "message", "label": "📤 分享我的推薦碼", "text": "我的推薦碼"}}
             ]
@@ -880,6 +866,100 @@ def push_now():
 def trigger_reset():
     reset_monthly_subscription()
     return "月訂閱重置已觸發", 200
+
+
+# ══════════════════════════════════════════
+#  LINE PAY 付款路由
+# ══════════════════════════════════════════
+
+@app.route("/pay/confirm", methods=["GET"])
+def linepay_confirm():
+    """LINE PAY 付款完成後的回呼"""
+    transaction_id = request.args.get("transactionId")
+    order_id = request.args.get("orderId")
+
+    if not transaction_id or not order_id:
+        return "參數錯誤", 400
+
+    try:
+        # 從資料庫查詢訂單
+        result = supabase.table("payments").select("*").eq("order_id", order_id).execute()
+        if not result.data:
+            return "找不到訂單", 404
+
+        payment = result.data[0]
+        amount = payment["amount"]
+        line_user_id = payment["user_id"]
+
+        # 向 LINE PAY 確認付款
+        success = asyncio.run(confirm_payment(transaction_id, amount))
+
+        if success:
+            tz = pytz.timezone("Asia/Taipei")
+            now = datetime.datetime.now(tz)
+            expires_at = now + datetime.timedelta(days=30)
+
+            # 更新付款狀態
+            supabase.table("payments").update({
+                "status": "confirmed",
+                "transaction_id": str(transaction_id),
+                "confirmed_at": now.isoformat()
+            }).eq("order_id", order_id).execute()
+
+            # 升級用戶為月訂閱
+            supabase.table("users").update({
+                "subscription_type": "monthly",
+                "plan": "vip",
+                "tokens": 15,
+                "free_readings_used": 0,
+                "subscription_expires_at": expires_at.date().isoformat(),
+                "subscription_reset_date": now.date().isoformat()
+            }).eq("line_user_id", line_user_id).execute()
+
+            supabase.table("token_logs").insert({
+                "line_user_id": line_user_id,
+                "change": 15,
+                "reason": "月訂閱付款成功"
+            }).execute()
+
+            # 推播通知用戶
+            push_text(
+                line_user_id,
+                "🎉 付款成功！歡迎加入星運 VIP！\n\n"
+                "👑 月訂閱・星運令 已啟用\n"
+                "💎 本月靈性占卜額度：15 次\n"
+                f"📅 訂閱到期日：{expires_at.date()}\n\n"
+                "老師已準備好，隨時為您指引星途 🔮"
+            )
+
+            return """
+            <html><body style="font-family:sans-serif;text-align:center;padding:50px;">
+            <h2>✅ 付款成功！</h2>
+            <p>歡迎加入星運 VIP 🌟</p>
+            <p>請返回 LINE 查看訂閱詳情</p>
+            </body></html>
+            """, 200
+        else:
+            supabase.table("payments").update({"status": "failed"}).eq("order_id", order_id).execute()
+            return "付款確認失敗", 400
+
+    except Exception as e:
+        print(f"[LINE PAY confirm 錯誤] {e}")
+        return "伺服器錯誤", 500
+
+
+@app.route("/pay/cancel", methods=["GET"])
+def linepay_cancel():
+    """用戶取消付款"""
+    order_id = request.args.get("orderId")
+    if order_id:
+        supabase.table("payments").update({"status": "cancelled"}).eq("order_id", order_id).execute()
+    return """
+    <html><body style="font-family:sans-serif;text-align:center;padding:50px;">
+    <h2>❌ 付款已取消</h2>
+    <p>請返回 LINE 重新操作</p>
+    </body></html>
+    """, 200
 
 
 @app.route("/callback", methods=["POST"])
@@ -1112,6 +1192,55 @@ def handle_message(event):
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
                 reply_token=event.reply_token,
                 messages=[build_vip_flex(referral_code=ref_code)]
+            ))
+        return
+
+    # ══════════════════════════════════════════
+    #  LINE PAY 月訂閱付款觸發
+    # ══════════════════════════════════════════
+    elif user_msg in ["訂閱", "月訂閱", "訂閱月訂閱"]:
+        try:
+            order_id = str(uuid.uuid4())
+            confirm_url = f"{RENDER_URL}/pay/confirm"
+
+            # 先把訂單存進 Supabase
+            supabase.table("payments").insert({
+                "user_id": line_user_id,
+                "order_id": order_id,
+                "amount": 300,
+                "currency": "TWD",
+                "package_type": "monthly",
+                "status": "pending"
+            }).execute()
+
+            # 建立 LINE PAY 付款連結
+            payment_url, transaction_id = asyncio.run(create_payment(
+                user_id=line_user_id,
+                amount=300,
+                order_id=order_id,
+                product_name="星運導航・月訂閱",
+                confirm_url=confirm_url
+            ))
+
+            # 更新 transaction_id
+            supabase.table("payments").update({
+                "transaction_id": str(transaction_id)
+            }).eq("order_id", order_id).execute()
+
+            reply_text = (
+                "👑 月訂閱・星運令 NT$300／月\n\n"
+                "請點以下連結完成付款：\n"
+                f"{payment_url}\n\n"
+                "付款完成後老師會立即為您開通 🌟"
+            )
+        except Exception as e:
+            print(f"[LINE PAY 建立付款錯誤] {e}")
+            reply_text = "✨ 付款連結建立失敗，請稍後再試或聯繫客服 🙏"
+
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[TextMessage(text=reply_text)]
             ))
         return
 
@@ -1350,4 +1479,3 @@ def handle_postback(event):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
