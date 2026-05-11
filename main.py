@@ -855,6 +855,38 @@ def build_daily_flex(card, orientation, reading, zodiac, today_str):
 def health_check():
     return "OK", 200
 
+@app.route("/shop", methods=["GET"])
+def shop_page():
+    return """
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>星運導航・商店</title>
+<style>
+  body{font-family:sans-serif;text-align:center;padding:40px;background:#F8F4FF;color:#333;}
+  h2{color:#6B4FA0;}
+  .item{background:#fff;border-radius:12px;padding:20px;margin:16px auto;max-width:360px;box-shadow:0 2px 8px rgba(107,79,160,0.15);}
+  .price{color:#6B4FA0;font-weight:bold;font-size:1.2em;}
+  .hint{color:#888;font-size:0.85em;margin-top:8px;}
+</style>
+</head>
+<body>
+<h2>🔮 星運導航・商店</h2>
+<p>請在 LINE 中輸入對應指令完成購買</p>
+<div class="item">
+  <div>👑 月訂閱・星運令</div>
+  <div class="price">NT$300 / 月</div>
+  <div class="hint">每月 15 次靈性占卜額度<br>在 LINE 傳送「訂閱」即可付款</div>
+</div>
+<div class="item">
+  <div>🆘 急救占卜代幣包</div>
+  <div class="price">NT$500 起</div>
+  <div class="hint">在 LINE 傳送「星運VIP」查看方案</div>
+</div>
+<p style="color:#aaa;font-size:0.8em;margin-top:32px;">© 星運導航 2026</p>
+</body>
+</html>
+""", 200
+
 
 @app.route("/push-now", methods=["GET"])
 def push_now():
