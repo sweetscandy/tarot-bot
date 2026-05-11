@@ -4,3 +4,4 @@ groq
 supabase
 gunicorn
 pytz
+httpx
