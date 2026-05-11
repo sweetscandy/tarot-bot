@@ -12,8 +12,6 @@ from linebot.v3.webhooks import (
 from linebot.v3.exceptions import InvalidSignatureError
 from groq import Groq
 from supabase import create_client
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
 import os, random, datetime, pytz, threading
 
 app = Flask(__name__)
