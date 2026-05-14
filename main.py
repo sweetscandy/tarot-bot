@@ -13,7 +13,7 @@ from linebot.v3.exceptions import InvalidSignatureError
 from groq import Groq
 from supabase import create_client
 from linepay import create_payment, confirm_payment
-import os, random, datetime, pytz, threading, uuid, asyncio
+import os, random, datetime, pytz, threading, uuid
 
 app = Flask(__name__)
 
@@ -24,7 +24,7 @@ supabase = create_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABAS
 
 RENDER_URL = os.environ.get("RENDER_URL", "https://tarot-bot-qqgg.onrender.com")
 FREE_READING_LIMIT = 3
-SHOP_URL = "https://tarot-bot-qqgg.onrender.com"
+SHOP_URL = "https://tarot-bot-qqgg.onrender.com/shop"
 
 TAROT_CARDS = [
     "愚者", "魔術師", "女祭司", "女皇", "皇帝", "教皇", "戀人", "戰車",
@@ -500,7 +500,7 @@ def do_daily_push():
 
 
 # ══════════════════════════════════════════
-#  排程器
+#  pending_state
 # ══════════════════════════════════════════
 
 pending_state = {}
@@ -855,34 +855,38 @@ def build_daily_flex(card, orientation, reading, zodiac, today_str):
 def health_check():
     return "OK", 200
 
+
 @app.route("/shop", methods=["GET"])
 def shop_page():
     return """
 <html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>星運導航・商店</title>
-<style>
-  body{font-family:sans-serif;text-align:center;padding:40px;background:#F8F4FF;color:#333;}
-  h2{color:#6B4FA0;}
-  .item{background:#fff;border-radius:12px;padding:20px;margin:16px auto;max-width:360px;box-shadow:0 2px 8px rgba(107,79,160,0.15);}
-  .price{color:#6B4FA0;font-weight:bold;font-size:1.2em;}
-  .hint{color:#888;font-size:0.85em;margin-top:8px;}
-</style>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>星運導航・商店</title>
+  <style>
+    body{font-family:sans-serif;text-align:center;padding:40px;background:#F8F4FF;color:#333;}
+    h2{color:#6B4FA0;}
+    .item{background:#fff;border-radius:12px;padding:20px;margin:16px auto;max-width:360px;
+          box-shadow:0 2px 8px rgba(107,79,160,0.15);}
+    .price{color:#6B4FA0;font-weight:bold;font-size:1.2em;}
+    .hint{color:#888;font-size:0.85em;margin-top:8px;}
+  </style>
 </head>
 <body>
-<h2>🔮 星運導航・商店</h2>
-<p>請在 LINE 中輸入對應指令完成購買</p>
-<div class="item">
-  <div>👑 月訂閱・星運令</div>
-  <div class="price">NT$300 / 月</div>
-  <div class="hint">每月 15 次靈性占卜額度<br>在 LINE 傳送「訂閱」即可付款</div>
-</div>
-<div class="item">
-  <div>🆘 急救占卜代幣包</div>
-  <div class="price">NT$500 起</div>
-  <div class="hint">在 LINE 傳送「星運VIP」查看方案</div>
-</div>
-<p style="color:#aaa;font-size:0.8em;margin-top:32px;">© 星運導航 2026</p>
+  <h2>🔮 星運導航・商店</h2>
+  <p>請在 LINE 中輸入對應指令完成購買</p>
+  <div class="item">
+    <div>👑 月訂閱・星運令</div>
+    <div class="price">NT$300 / 月</div>
+    <div class="hint">每月 15 次靈性占卜額度<br>在 LINE 傳送「訂閱」即可付款</div>
+  </div>
+  <div class="item">
+    <div>🆘 急救占卜代幣包</div>
+    <div class="price">NT$500 起</div>
+    <div class="hint">在 LINE 傳送「星運VIP」查看方案</div>
+  </div>
+  <p style="color:#aaa;font-size:0.8em;margin-top:32px;">© 星運導航 2026</p>
 </body>
 </html>
 """, 200
@@ -914,7 +918,6 @@ def linepay_confirm():
         return "參數錯誤", 400
 
     try:
-        # 從資料庫查詢訂單
         result = supabase.table("payments").select("*").eq("order_id", order_id).execute()
         if not result.data:
             return "找不到訂單", 404
@@ -923,22 +926,20 @@ def linepay_confirm():
         amount = payment["amount"]
         line_user_id = payment["user_id"]
 
-        # 向 LINE PAY 確認付款
-        success = asyncio.run(confirm_payment(transaction_id, amount))
+        # ✅ 同步呼叫，不用 asyncio.run
+        success = confirm_payment(transaction_id, amount)
 
         if success:
             tz = pytz.timezone("Asia/Taipei")
             now = datetime.datetime.now(tz)
             expires_at = now + datetime.timedelta(days=30)
 
-            # 更新付款狀態
             supabase.table("payments").update({
                 "status": "confirmed",
                 "transaction_id": str(transaction_id),
                 "confirmed_at": now.isoformat()
             }).eq("order_id", order_id).execute()
 
-            # 升級用戶為月訂閱
             supabase.table("users").update({
                 "subscription_type": "monthly",
                 "plan": "vip",
@@ -954,7 +955,6 @@ def linepay_confirm():
                 "reason": "月訂閱付款成功"
             }).execute()
 
-            # 推播通知用戶
             push_text(
                 line_user_id,
                 "🎉 付款成功！歡迎加入星運 VIP！\n\n"
@@ -1227,15 +1227,11 @@ def handle_message(event):
             ))
         return
 
-    # ══════════════════════════════════════════
-    #  LINE PAY 月訂閱付款觸發
-    # ══════════════════════════════════════════
     elif user_msg in ["訂閱", "月訂閱", "訂閱月訂閱"]:
         try:
             order_id = str(uuid.uuid4())
             confirm_url = f"{RENDER_URL}/pay/confirm"
 
-            # 先把訂單存進 Supabase
             supabase.table("payments").insert({
                 "user_id": line_user_id,
                 "order_id": order_id,
@@ -1245,16 +1241,15 @@ def handle_message(event):
                 "status": "pending"
             }).execute()
 
-            # 建立 LINE PAY 付款連結
-            payment_url, transaction_id = asyncio.run(create_payment(
+            # ✅ 同步呼叫，不用 asyncio.run
+            payment_url, transaction_id = create_payment(
                 user_id=line_user_id,
                 amount=300,
                 order_id=order_id,
                 product_name="星運導航・月訂閱",
                 confirm_url=confirm_url
-            ))
+            )
 
-            # 更新 transaction_id
             supabase.table("payments").update({
                 "transaction_id": str(transaction_id)
             }).eq("order_id", order_id).execute()
@@ -1511,3 +1506,4 @@ def handle_postback(event):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
