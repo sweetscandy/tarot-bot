@@ -9,7 +9,6 @@ ECPAY_MERCHANT_ID = os.environ.get("ECPAY_MERCHANT_ID", "3500485")
 ECPAY_HASH_KEY = os.environ.get("ECPAY_HASH_KEY")
 ECPAY_HASH_IV = os.environ.get("ECPAY_HASH_IV")
 ECPAY_BASE_URL = "https://payment.ecpay.com.tw"  # 正式環境
-# 正式環境改為 https://payment.ecpay.com.tw
 
 def generate_check_mac_value(params: dict) -> str:
     """產生綠界檢查碼 CheckMacValue"""
@@ -45,7 +44,7 @@ def create_payment(user_id: str, amount: int, order_id: str,
         "MerchantTradeDate": trade_date,
         "PaymentType": "aio",
         "TotalAmount": str(amount),
-        "TradeDesc": urllib.parse.quote("星運導航訂閱"),
+        "TradeDesc": "星運導航訂閱",               # ✅ 修正：直接傳中文，不預先 quote
         "ItemName": product_name,
         "ReturnURL": confirm_url.replace("/pay/confirm", "/pay/notify"),  # 後端通知
         "OrderResultURL": confirm_url,              # 前端跳轉
