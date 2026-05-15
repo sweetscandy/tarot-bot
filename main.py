@@ -625,7 +625,6 @@ def build_type_select_flex(mode="daily"):
     return FlexMessage(alt_text="請選擇占卜方式", contents=FlexContainer.from_dict(flex_content))
 
 
-# ── 修改點1：build_token_flex 的「購買代幣包」按鈕改為觸發「購買代幣」訊息 ──
 def build_token_flex(tokens, used, subscription_type="free"):
     remaining = max(0, FREE_READING_LIMIT - used)
     is_monthly = subscription_type == "monthly"
@@ -679,7 +678,6 @@ def build_token_flex(tokens, used, subscription_type="free"):
             "contents": [
                 {
                     "type": "button", "style": "primary", "color": "#6B4FA0",
-                    # ✅ 改這裡：觸發「購買代幣」訊息，進入代幣包選擇流程
                     "action": {"type": "message", "label": "✨ 購買代幣包", "text": "購買代幣"}
                 },
                 {
@@ -696,7 +694,6 @@ def build_token_flex(tokens, used, subscription_type="free"):
     return FlexMessage(alt_text="我的代幣", contents=FlexContainer.from_dict(flex_content))
 
 
-# ── 新增：代幣包選擇 Flex ──
 def build_token_shop_flex():
     flex_content = {
         "type": "bubble",
@@ -1036,12 +1033,51 @@ def trigger_reset():
 
 
 # ══════════════════════════════════════════
+#  ⚠️ 除錯路由（確認後請刪除！）
+# ══════════════════════════════════════════
+
+@app.route("/debug-ecpay", methods=["GET"])
+def debug_ecpay():
+    merchant_id = os.environ.get("ECPAY_MERCHANT_ID", "未設定")
+    hash_key = os.environ.get("ECPAY_HASH_KEY", "未設定")
+    hash_iv = os.environ.get("ECPAY_HASH_IV", "未設定")
+    hk_display = f"{hash_key[:4]}...{hash_key[-4:]}" if len(hash_key) > 8 else hash_key
+    hiv_display = f"{hash_iv[:4]}...{hash_iv[-4:]}" if len(hash_iv) > 8 else hash_iv
+    return f"""
+    <html><body style="font-family:monospace;padding:40px;background:#F8F4FF;">
+    <h2>🔍 ECPay 環境變數檢查</h2>
+    <table border="1" cellpadding="10" style="border-collapse:collapse;">
+      <tr><th>變數名稱</th><th>值（部分遮蔽）</th><th>長度</th><th>狀態</th></tr>
+      <tr>
+        <td>ECPAY_MERCHANT_ID</td>
+        <td>{merchant_id}</td>
+        <td>{len(merchant_id)}</td>
+        <td>{"✅ 正常" if len(merchant_id) == 7 else "⚠️ 長度異常（應為7碼）"}</td>
+      </tr>
+      <tr>
+        <td>ECPAY_HASH_KEY</td>
+        <td>{hk_display}</td>
+        <td>{len(hash_key)}</td>
+        <td>{"✅ 正常" if len(hash_key) == 20 else "⚠️ 長度異常（應為20碼）"}</td>
+      </tr>
+      <tr>
+        <td>ECPAY_HASH_IV</td>
+        <td>{hiv_display}</td>
+        <td>{len(hash_iv)}</td>
+        <td>{"✅ 正常" if len(hash_iv) == 16 else "⚠️ 長度異常（應為16碼）"}</td>
+      </tr>
+    </table>
+    <p style="color:red;margin-top:20px;">⚠️ 確認完畢後請立即刪除此路由！</p>
+    </body></html>
+    """, 200
+
+
+# ══════════════════════════════════════════
 #  綠界金流路由
 # ══════════════════════════════════════════
 
 @app.route("/pay/go/<order_id>", methods=["GET"])
 def ecpay_go(order_id):
-    """用戶點連結後，產生綠界表單並自動跳轉至付款頁"""
     try:
         result = supabase.table("payments").select("*").eq("order_id", order_id).execute()
         if not result.data:
@@ -1074,7 +1110,6 @@ def ecpay_go(order_id):
 
 @app.route("/pay/notify", methods=["POST"])
 def ecpay_notify():
-    """綠界後端通知（ReturnURL）- 伺服器對伺服器"""
     try:
         form_data = request.form.to_dict()
         print(f"[綠界通知] {form_data}")
@@ -1096,7 +1131,6 @@ def ecpay_notify():
 
 @app.route("/pay/confirm", methods=["GET", "POST"])
 def ecpay_confirm():
-    """綠界前端跳轉（OrderResultURL）- 用戶付款後看到的頁面"""
     try:
         if request.method == "POST":
             rtn_code = request.form.get("RtnCode", "")
@@ -1155,7 +1189,6 @@ def ecpay_confirm():
 
 @app.route("/pay/cancel", methods=["GET"])
 def ecpay_cancel():
-    """用戶取消付款"""
     order_id = request.args.get("orderId", "")
     if order_id:
         try:
@@ -1421,7 +1454,6 @@ def handle_message(event):
             ))
         return
 
-    # ── 新增：購買代幣包選擇 ──
     elif user_msg in ["購買代幣", "代幣包", "購買代幣包"]:
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
@@ -1430,17 +1462,15 @@ def handle_message(event):
             ))
         return
 
-    # ── 新增：三個代幣包付款流程 ──
     elif user_msg in ["購買入門包", "購買超值包", "購買豪華包"]:
         pkg_map = {
-            "購買入門包": {"amount": 500,  "tokens": 3,  "name": "入門包",  "label": "🌱 入門包"},
-            "購買超值包": {"amount": 1200, "tokens": 8,  "name": "超值包",  "label": "💫 超值包"},
-            "購買豪華包": {"amount": 2000, "tokens": 15, "name": "豪華包",  "label": "🌌 豪華包"},
+            "購買入門包": {"amount": 500,  "tokens": 3,  "name": "入門包", "label": "🌱 入門包"},
+            "購買超值包": {"amount": 1200, "tokens": 8,  "name": "超值包", "label": "💫 超值包"},
+            "購買豪華包": {"amount": 2000, "tokens": 15, "name": "豪華包", "label": "🌌 豪華包"},
         }
         pkg = pkg_map[user_msg]
         try:
             order_id = str(uuid.uuid4()).replace("-", "")[:20]
-
             supabase.table("payments").insert({
                 "user_id": line_user_id,
                 "order_id": order_id,
@@ -1450,7 +1480,6 @@ def handle_message(event):
                 "tokens_to_add": pkg["tokens"],
                 "status": "pending"
             }).execute()
-
             pay_url = f"{RENDER_URL}/pay/go/{order_id}"
             reply_text = (
                 f"{pkg['label']} NT${pkg['amount']} → {pkg['tokens']} 枚代幣\n\n"
@@ -1461,7 +1490,6 @@ def handle_message(event):
         except Exception as e:
             print(f"[代幣包建立付款錯誤] {e}")
             reply_text = "✨ 付款連結建立失敗，請稍後再試 🙏"
-
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
                 reply_token=event.reply_token,
@@ -1472,7 +1500,6 @@ def handle_message(event):
     elif user_msg in ["訂閱", "月訂閱", "訂閱月訂閱"]:
         try:
             order_id = str(uuid.uuid4()).replace("-", "")[:20]
-
             supabase.table("payments").insert({
                 "user_id": line_user_id,
                 "order_id": order_id,
@@ -1482,7 +1509,6 @@ def handle_message(event):
                 "tokens_to_add": 0,
                 "status": "pending"
             }).execute()
-
             pay_url = f"{RENDER_URL}/pay/go/{order_id}"
             reply_text = (
                 "👑 月訂閱・星運令 NT$300／月\n\n"
@@ -1493,7 +1519,6 @@ def handle_message(event):
         except Exception as e:
             print(f"[綠界建立付款錯誤] {e}")
             reply_text = "✨ 付款連結建立失敗，請稍後再試 🙏"
-
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
                 reply_token=event.reply_token,
@@ -1736,3 +1761,4 @@ def handle_postback(event):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
