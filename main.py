@@ -225,11 +225,11 @@ def push_text(line_user_id, text):
 
 
 # ══════════════════════════════════════════
-#  付款開通共用函式
+#  付款開通共用函式（支援月訂閱 + 代幣包）
 # ══════════════════════════════════════════
 
 def _activate_subscription(order_id):
-    """付款成功後開通訂閱（防止重複執行）"""
+    """付款成功後開通訂閱或入帳代幣（防止重複執行）"""
     if not order_id:
         return
     try:
@@ -241,38 +241,63 @@ def _activate_subscription(order_id):
             return  # 已處理過，跳過
 
         line_user_id = payment["user_id"]
+        package_type = payment.get("package_type", "monthly")
         tz = pytz.timezone("Asia/Taipei")
         now = datetime.datetime.now(tz)
-        expires_at = now + datetime.timedelta(days=30)
 
+        # 先標記已確認，防止重複觸發
         supabase.table("payments").update({
             "status": "confirmed",
             "confirmed_at": now.isoformat()
         }).eq("order_id", order_id).execute()
 
-        supabase.table("users").update({
-            "subscription_type": "monthly",
-            "plan": "vip",
-            "tokens": 15,
-            "free_readings_used": 0,
-            "subscription_expires_at": expires_at.date().isoformat(),
-            "subscription_reset_date": now.date().isoformat()
-        }).eq("line_user_id", line_user_id).execute()
+        # ── 月訂閱 ──
+        if package_type == "monthly":
+            expires_at = now + datetime.timedelta(days=30)
+            supabase.table("users").update({
+                "subscription_type": "monthly",
+                "plan": "vip",
+                "tokens": 15,
+                "free_readings_used": 0,
+                "subscription_expires_at": expires_at.date().isoformat(),
+                "subscription_reset_date": now.date().isoformat()
+            }).eq("line_user_id", line_user_id).execute()
+            supabase.table("token_logs").insert({
+                "line_user_id": line_user_id,
+                "change": 15,
+                "reason": "月訂閱付款成功"
+            }).execute()
+            push_text(
+                line_user_id,
+                "🎉 付款成功！歡迎加入星運 VIP！\n\n"
+                "👑 月訂閱・星運令 已啟用\n"
+                "💎 本月靈性占卜額度：15 次\n"
+                f"📅 訂閱到期日：{expires_at.date()}\n\n"
+                "老師已準備好，隨時為您指引星途 🔮"
+            )
 
-        supabase.table("token_logs").insert({
-            "line_user_id": line_user_id,
-            "change": 15,
-            "reason": "月訂閱付款成功"
-        }).execute()
+        # ── 代幣包 ──
+        else:
+            tokens_to_add = payment.get("tokens_to_add") or 0
+            if tokens_to_add > 0:
+                user = get_or_create_user(line_user_id)
+                new_tokens = (user.get("tokens") or 0) + tokens_to_add
+                supabase.table("users").update({
+                    "tokens": new_tokens
+                }).eq("line_user_id", line_user_id).execute()
+                supabase.table("token_logs").insert({
+                    "line_user_id": line_user_id,
+                    "change": tokens_to_add,
+                    "reason": f"{package_type}付款成功"
+                }).execute()
+                push_text(
+                    line_user_id,
+                    f"🎉 付款成功！代幣已入帳！\n\n"
+                    f"💎 新增代幣：{tokens_to_add} 枚\n"
+                    f"💰 目前代幣餘額：{new_tokens} 枚\n\n"
+                    f"老師已準備好，隨時為您進行急救占卜 🔮"
+                )
 
-        push_text(
-            line_user_id,
-            "🎉 付款成功！歡迎加入星運 VIP！\n\n"
-            "👑 月訂閱・星運令 已啟用\n"
-            "💎 本月靈性占卜額度：15 次\n"
-            f"📅 訂閱到期日：{expires_at.date()}\n\n"
-            "老師已準備好，隨時為您指引星途 🔮"
-        )
     except Exception as e:
         print(f"[_activate_subscription 錯誤] {e}")
 
@@ -600,6 +625,7 @@ def build_type_select_flex(mode="daily"):
     return FlexMessage(alt_text="請選擇占卜方式", contents=FlexContainer.from_dict(flex_content))
 
 
+# ── 修改點1：build_token_flex 的「購買代幣包」按鈕改為觸發「購買代幣」訊息 ──
 def build_token_flex(tokens, used, subscription_type="free"):
     remaining = max(0, FREE_READING_LIMIT - used)
     is_monthly = subscription_type == "monthly"
@@ -653,7 +679,8 @@ def build_token_flex(tokens, used, subscription_type="free"):
             "contents": [
                 {
                     "type": "button", "style": "primary", "color": "#6B4FA0",
-                    "action": {"type": "message", "label": "✨ 購買代幣包", "text": "星運VIP"}
+                    # ✅ 改這裡：觸發「購買代幣」訊息，進入代幣包選擇流程
+                    "action": {"type": "message", "label": "✨ 購買代幣包", "text": "購買代幣"}
                 },
                 {
                     "type": "button", "style": "secondary",
@@ -667,6 +694,55 @@ def build_token_flex(tokens, used, subscription_type="free"):
         }
     }
     return FlexMessage(alt_text="我的代幣", contents=FlexContainer.from_dict(flex_content))
+
+
+# ── 新增：代幣包選擇 Flex ──
+def build_token_shop_flex():
+    flex_content = {
+        "type": "bubble",
+        "styles": {
+            "header": {"backgroundColor": "#2D1B69"},
+            "body": {"backgroundColor": "#F8F4FF"}
+        },
+        "header": {
+            "type": "box", "layout": "vertical",
+            "contents": [
+                {"type": "text", "text": "✨ 購買代幣包", "color": "#FFFFFF", "weight": "bold", "size": "lg"},
+                {"type": "text", "text": "選擇最適合您的方案 🔮", "color": "#C9B8FF", "size": "xs"}
+            ]
+        },
+        "body": {
+            "type": "box", "layout": "vertical", "spacing": "sm",
+            "contents": [
+                {"type": "text", "text": "🌱 入門包　$500 → 3 次", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
+                {"type": "text", "text": "第一步踏入星盤，命運從這裡開始轉動", "color": "#888888", "size": "xs", "wrap": True},
+                {"type": "separator"},
+                {"type": "text", "text": "💫 超值包　$1,200 → 8 次", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
+                {"type": "text", "text": "最受歡迎！平均每次只要 $150，星辰常伴左右", "color": "#888888", "size": "xs", "wrap": True},
+                {"type": "separator"},
+                {"type": "text", "text": "🌌 豪華包　$2,000 → 15 次", "color": "#B8860B", "weight": "bold", "size": "sm"},
+                {"type": "text", "text": "深度陪伴，讓老師全年守護你的每個轉折", "color": "#888888", "size": "xs", "wrap": True},
+            ]
+        },
+        "footer": {
+            "type": "box", "layout": "vertical", "spacing": "sm",
+            "contents": [
+                {
+                    "type": "button", "style": "primary", "color": "#6B4FA0",
+                    "action": {"type": "message", "label": "🌱 入門包 $500 → 3次", "text": "購買入門包"}
+                },
+                {
+                    "type": "button", "style": "primary", "color": "#4A3080",
+                    "action": {"type": "message", "label": "💫 超值包 $1,200 → 8次", "text": "購買超值包"}
+                },
+                {
+                    "type": "button", "style": "primary", "color": "#2D1B69",
+                    "action": {"type": "message", "label": "🌌 豪華包 $2,000 → 15次", "text": "購買豪華包"}
+                }
+            ]
+        }
+    }
+    return FlexMessage(alt_text="購買代幣包", contents=FlexContainer.from_dict(flex_content))
 
 
 def build_tianbook_flex():
@@ -752,6 +828,8 @@ def build_vip_flex(referral_code=""):
             "contents": [
                 {"type": "button", "style": "primary", "color": "#B8860B",
                  "action": {"type": "message", "label": "👑 立即訂閱 NT$300／月", "text": "訂閱"}},
+                {"type": "button", "style": "primary", "color": "#6B4FA0",
+                 "action": {"type": "message", "label": "✨ 購買代幣包", "text": "購買代幣"}},
                 {"type": "button", "style": "secondary",
                  "action": {"type": "message", "label": "📤 分享我的推薦碼", "text": "我的推薦碼"}}
             ]
@@ -937,7 +1015,7 @@ def shop_page():
   <div class="item">
     <div>🆘 急救占卜代幣包</div>
     <div class="price">NT$500 起</div>
-    <div class="hint">在 LINE 傳送「星運VIP」查看方案</div>
+    <div class="hint">在 LINE 傳送「購買代幣」查看方案</div>
   </div>
   <p style="color:#aaa;font-size:0.8em;margin-top:32px;">© 星運導航 2026</p>
 </body>
@@ -978,12 +1056,13 @@ def ecpay_go(order_id):
             </body></html>
             """, 200
 
+        pkg_name = payment.get("package_type", "月訂閱")
         confirm_url = f"{RENDER_URL}/pay/confirm"
         html, _ = ecpay_create(
             user_id=payment["user_id"],
             amount=payment["amount"],
             order_id=order_id,
-            product_name="星運導航・月訂閱",
+            product_name=f"星運導航・{pkg_name}",
             confirm_url=confirm_url
         )
         return html
@@ -1042,8 +1121,8 @@ def ecpay_confirm():
             </head>
             <body>
               <h2>✅ 付款成功！</h2>
-              <p>歡迎加入星運 VIP 🌟</p>
-              <p>請返回 LINE 查看訂閱詳情</p>
+              <p>感謝您的購買 🌟</p>
+              <p>請返回 LINE 查看最新狀態</p>
               <p style="color:#aaa;font-size:0.85em;margin-top:32px;">老師已準備好，隨時為您指引星途 🔮</p>
             </body>
             </html>
@@ -1342,10 +1421,57 @@ def handle_message(event):
             ))
         return
 
+    # ── 新增：購買代幣包選擇 ──
+    elif user_msg in ["購買代幣", "代幣包", "購買代幣包"]:
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[build_token_shop_flex()]
+            ))
+        return
+
+    # ── 新增：三個代幣包付款流程 ──
+    elif user_msg in ["購買入門包", "購買超值包", "購買豪華包"]:
+        pkg_map = {
+            "購買入門包": {"amount": 500,  "tokens": 3,  "name": "入門包",  "label": "🌱 入門包"},
+            "購買超值包": {"amount": 1200, "tokens": 8,  "name": "超值包",  "label": "💫 超值包"},
+            "購買豪華包": {"amount": 2000, "tokens": 15, "name": "豪華包",  "label": "🌌 豪華包"},
+        }
+        pkg = pkg_map[user_msg]
+        try:
+            order_id = str(uuid.uuid4()).replace("-", "")[:20]
+
+            supabase.table("payments").insert({
+                "user_id": line_user_id,
+                "order_id": order_id,
+                "amount": pkg["amount"],
+                "currency": "TWD",
+                "package_type": pkg["name"],
+                "tokens_to_add": pkg["tokens"],
+                "status": "pending"
+            }).execute()
+
+            pay_url = f"{RENDER_URL}/pay/go/{order_id}"
+            reply_text = (
+                f"{pkg['label']} NT${pkg['amount']} → {pkg['tokens']} 枚代幣\n\n"
+                f"請點以下連結完成付款：\n"
+                f"{pay_url}\n\n"
+                f"付款完成後代幣將立即入帳 🌟"
+            )
+        except Exception as e:
+            print(f"[代幣包建立付款錯誤] {e}")
+            reply_text = "✨ 付款連結建立失敗，請稍後再試 🙏"
+
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[TextMessage(text=reply_text)]
+            ))
+        return
+
     elif user_msg in ["訂閱", "月訂閱", "訂閱月訂閱"]:
         try:
             order_id = str(uuid.uuid4()).replace("-", "")[:20]
-            confirm_url = f"{RENDER_URL}/pay/confirm"
 
             supabase.table("payments").insert({
                 "user_id": line_user_id,
@@ -1353,11 +1479,11 @@ def handle_message(event):
                 "amount": 300,
                 "currency": "TWD",
                 "package_type": "monthly",
+                "tokens_to_add": 0,
                 "status": "pending"
             }).execute()
 
             pay_url = f"{RENDER_URL}/pay/go/{order_id}"
-
             reply_text = (
                 "👑 月訂閱・星運令 NT$300／月\n\n"
                 "請點以下連結完成付款：\n"
@@ -1486,7 +1612,7 @@ def handle_message(event):
         reply_text = (
             "🔮 星運導航使用說明\n\n"
             "🌙 今日運勢 → 塔羅／八字／易經每日解讀\n"
-            "🆘 急救占卜 → 感情、工作、人生卡關？讓星盤給你答案（NT$1,200）\n"
+            "🆘 急救占卜 → 感情、工作、人生卡關？讓星盤給你答案\n"
             "💎 我的代幣 → 查詢餘額與儲值\n"
             "📖 專屬天書 → 合盤／流年／紫微斗數\n"
             "👑 星運VIP → 查看訂閱方案\n"
@@ -1610,4 +1736,3 @@ def handle_postback(event):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
