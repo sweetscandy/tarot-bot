@@ -8,7 +8,7 @@ import os
 ECPAY_MERCHANT_ID = os.environ.get("ECPAY_MERCHANT_ID", "3500485")
 ECPAY_HASH_KEY = os.environ.get("ECPAY_HASH_KEY")
 ECPAY_HASH_IV = os.environ.get("ECPAY_HASH_IV")
-ECPAY_BASE_URL = "https://payment-stage.ecpay.com.tw"  # 測試環境
+ECPAY_BASE_URL = "https://payment.ecpay.com.tw"  # 正式環境
 # 正式環境改為 https://payment.ecpay.com.tw
 
 def generate_check_mac_value(params: dict) -> str:
