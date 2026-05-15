@@ -12,7 +12,7 @@ from linebot.v3.webhooks import (
 from linebot.v3.exceptions import InvalidSignatureError
 from groq import Groq
 from supabase import create_client
-from linepay import create_payment, confirm_payment
+from ecpay import create_payment as ecpay_create, verify_notify, is_payment_success
 import os, random, datetime, pytz, threading, uuid
 
 app = Flask(__name__)
@@ -222,6 +222,59 @@ def push_text(line_user_id, text):
             )
     except Exception as e:
         print(f"[push_text 錯誤] {line_user_id}: {e}")
+
+
+# ══════════════════════════════════════════
+#  付款開通共用函式
+# ══════════════════════════════════════════
+
+def _activate_subscription(order_id):
+    """付款成功後開通訂閱（防止重複執行）"""
+    if not order_id:
+        return
+    try:
+        result = supabase.table("payments").select("*").eq("order_id", order_id).execute()
+        if not result.data:
+            return
+        payment = result.data[0]
+        if payment.get("status") == "confirmed":
+            return  # 已處理過，跳過
+
+        line_user_id = payment["user_id"]
+        tz = pytz.timezone("Asia/Taipei")
+        now = datetime.datetime.now(tz)
+        expires_at = now + datetime.timedelta(days=30)
+
+        supabase.table("payments").update({
+            "status": "confirmed",
+            "confirmed_at": now.isoformat()
+        }).eq("order_id", order_id).execute()
+
+        supabase.table("users").update({
+            "subscription_type": "monthly",
+            "plan": "vip",
+            "tokens": 15,
+            "free_readings_used": 0,
+            "subscription_expires_at": expires_at.date().isoformat(),
+            "subscription_reset_date": now.date().isoformat()
+        }).eq("line_user_id", line_user_id).execute()
+
+        supabase.table("token_logs").insert({
+            "line_user_id": line_user_id,
+            "change": 15,
+            "reason": "月訂閱付款成功"
+        }).execute()
+
+        push_text(
+            line_user_id,
+            "🎉 付款成功！歡迎加入星運 VIP！\n\n"
+            "👑 月訂閱・星運令 已啟用\n"
+            "💎 本月靈性占卜額度：15 次\n"
+            f"📅 訂閱到期日：{expires_at.date()}\n\n"
+            "老師已準備好，隨時為您指引星途 🔮"
+        )
+    except Exception as e:
+        print(f"[_activate_subscription 錯誤] {e}")
 
 
 # ══════════════════════════════════════════
@@ -600,7 +653,7 @@ def build_token_flex(tokens, used, subscription_type="free"):
             "contents": [
                 {
                     "type": "button", "style": "primary", "color": "#6B4FA0",
-                    "action": {"type": "uri", "label": "✨ 購買代幣包", "uri": SHOP_URL}
+                    "action": {"type": "message", "label": "✨ 購買代幣包", "text": "星運VIP"}
                 },
                 {
                     "type": "button", "style": "secondary",
@@ -698,7 +751,7 @@ def build_vip_flex(referral_code=""):
             "type": "box", "layout": "vertical", "spacing": "sm",
             "contents": [
                 {"type": "button", "style": "primary", "color": "#B8860B",
-                 "action": {"type": "message", "label": "👑 月訂閱 NT$300／月", "text": "訂閱"}},
+                 "action": {"type": "message", "label": "👑 立即訂閱 NT$300／月", "text": "訂閱"}},
                 {"type": "button", "style": "secondary",
                  "action": {"type": "message", "label": "📤 分享我的推薦碼", "text": "我的推薦碼"}}
             ]
@@ -905,94 +958,156 @@ def trigger_reset():
 
 
 # ══════════════════════════════════════════
-#  LINE PAY 付款路由
+#  綠界金流路由
 # ══════════════════════════════════════════
 
-@app.route("/pay/confirm", methods=["GET"])
-def linepay_confirm():
-    """LINE PAY 付款完成後的回呼"""
-    transaction_id = request.args.get("transactionId")
-    order_id = request.args.get("orderId")
-
-    if not transaction_id or not order_id:
-        return "參數錯誤", 400
-
+@app.route("/pay/go/<order_id>", methods=["GET"])
+def ecpay_go(order_id):
+    """用戶點連結後，產生綠界表單並自動跳轉至付款頁"""
     try:
         result = supabase.table("payments").select("*").eq("order_id", order_id).execute()
         if not result.data:
             return "找不到訂單", 404
 
         payment = result.data[0]
-        amount = payment["amount"]
-        line_user_id = payment["user_id"]
-
-        # ✅ 同步呼叫，不用 asyncio.run
-        success = confirm_payment(transaction_id, amount)
-
-        if success:
-            tz = pytz.timezone("Asia/Taipei")
-            now = datetime.datetime.now(tz)
-            expires_at = now + datetime.timedelta(days=30)
-
-            supabase.table("payments").update({
-                "status": "confirmed",
-                "transaction_id": str(transaction_id),
-                "confirmed_at": now.isoformat()
-            }).eq("order_id", order_id).execute()
-
-            supabase.table("users").update({
-                "subscription_type": "monthly",
-                "plan": "vip",
-                "tokens": 15,
-                "free_readings_used": 0,
-                "subscription_expires_at": expires_at.date().isoformat(),
-                "subscription_reset_date": now.date().isoformat()
-            }).eq("line_user_id", line_user_id).execute()
-
-            supabase.table("token_logs").insert({
-                "line_user_id": line_user_id,
-                "change": 15,
-                "reason": "月訂閱付款成功"
-            }).execute()
-
-            push_text(
-                line_user_id,
-                "🎉 付款成功！歡迎加入星運 VIP！\n\n"
-                "👑 月訂閱・星運令 已啟用\n"
-                "💎 本月靈性占卜額度：15 次\n"
-                f"📅 訂閱到期日：{expires_at.date()}\n\n"
-                "老師已準備好，隨時為您指引星途 🔮"
-            )
-
+        if payment.get("status") == "confirmed":
             return """
-            <html><body style="font-family:sans-serif;text-align:center;padding:50px;">
-            <h2>✅ 付款成功！</h2>
-            <p>歡迎加入星運 VIP 🌟</p>
-            <p>請返回 LINE 查看訂閱詳情</p>
+            <html><body style="font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;">
+            <h2>✅ 此訂單已完成付款</h2>
+            <p>請返回 LINE 查看訂閱詳情 🌟</p>
             </body></html>
             """, 200
-        else:
-            supabase.table("payments").update({"status": "failed"}).eq("order_id", order_id).execute()
-            return "付款確認失敗", 400
+
+        confirm_url = f"{RENDER_URL}/pay/confirm"
+        html, _ = ecpay_create(
+            user_id=payment["user_id"],
+            amount=payment["amount"],
+            order_id=order_id,
+            product_name="星運導航・月訂閱",
+            confirm_url=confirm_url
+        )
+        return html
 
     except Exception as e:
-        print(f"[LINE PAY confirm 錯誤] {e}")
+        print(f"[ecpay_go 錯誤] {e}")
+        return "伺服器錯誤，請返回 LINE 重新操作", 500
+
+
+@app.route("/pay/notify", methods=["POST"])
+def ecpay_notify():
+    """綠界後端通知（ReturnURL）- 伺服器對伺服器"""
+    try:
+        form_data = request.form.to_dict()
+        print(f"[綠界通知] {form_data}")
+
+        if not verify_notify(form_data):
+            print("[綠界通知] CheckMacValue 驗證失敗")
+            return "0|ErrorMessage", 200
+
+        if is_payment_success(form_data):
+            order_id = form_data.get("MerchantTradeNo")
+            _activate_subscription(order_id)
+
+        return "1|OK", 200
+
+    except Exception as e:
+        print(f"[ecpay_notify 錯誤] {e}")
+        return "0|ErrorMessage", 200
+
+
+@app.route("/pay/confirm", methods=["GET", "POST"])
+def ecpay_confirm():
+    """綠界前端跳轉（OrderResultURL）- 用戶付款後看到的頁面"""
+    try:
+        if request.method == "POST":
+            rtn_code = request.form.get("RtnCode", "")
+            order_id = request.form.get("MerchantTradeNo", "")
+        else:
+            rtn_code = request.args.get("RtnCode", "")
+            order_id = request.args.get("MerchantTradeNo", "")
+
+        if rtn_code == "1" and order_id:
+            _activate_subscription(order_id)
+            return """
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width,initial-scale=1">
+              <title>付款成功</title>
+              <style>
+                body{font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;}
+                h2{color:#6B4FA0;}
+                p{color:#555;}
+              </style>
+            </head>
+            <body>
+              <h2>✅ 付款成功！</h2>
+              <p>歡迎加入星運 VIP 🌟</p>
+              <p>請返回 LINE 查看訂閱詳情</p>
+              <p style="color:#aaa;font-size:0.85em;margin-top:32px;">老師已準備好，隨時為您指引星途 🔮</p>
+            </body>
+            </html>
+            """, 200
+        else:
+            return """
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width,initial-scale=1">
+              <title>付款未完成</title>
+              <style>
+                body{font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;}
+                h2{color:#cc4444;}
+                p{color:#555;}
+              </style>
+            </head>
+            <body>
+              <h2>❌ 付款未完成</h2>
+              <p>請返回 LINE 重新操作</p>
+              <p style="color:#aaa;font-size:0.85em;">若有疑問請聯繫客服 🙏</p>
+            </body>
+            </html>
+            """, 200
+
+    except Exception as e:
+        print(f"[ecpay_confirm 錯誤] {e}")
         return "伺服器錯誤", 500
 
 
 @app.route("/pay/cancel", methods=["GET"])
-def linepay_cancel():
+def ecpay_cancel():
     """用戶取消付款"""
-    order_id = request.args.get("orderId")
+    order_id = request.args.get("orderId", "")
     if order_id:
-        supabase.table("payments").update({"status": "cancelled"}).eq("order_id", order_id).execute()
+        try:
+            supabase.table("payments").update(
+                {"status": "cancelled"}
+            ).eq("order_id", order_id).execute()
+        except Exception as e:
+            print(f"[ecpay_cancel 錯誤] {e}")
     return """
-    <html><body style="font-family:sans-serif;text-align:center;padding:50px;">
-    <h2>❌ 付款已取消</h2>
-    <p>請返回 LINE 重新操作</p>
-    </body></html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <title>已取消</title>
+      <style>
+        body{font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;}
+        h2{color:#888;}
+        p{color:#555;}
+      </style>
+    </head>
+    <body>
+      <h2>❌ 付款已取消</h2>
+      <p>請返回 LINE 重新操作</p>
+    </body>
+    </html>
     """, 200
 
+
+# ══════════════════════════════════════════
+#  LINE Webhook 路由
+# ══════════════════════════════════════════
 
 @app.route("/callback", methods=["POST"])
 def callback():
@@ -1229,7 +1344,7 @@ def handle_message(event):
 
     elif user_msg in ["訂閱", "月訂閱", "訂閱月訂閱"]:
         try:
-            order_id = str(uuid.uuid4())
+            order_id = str(uuid.uuid4()).replace("-", "")[:20]
             confirm_url = f"{RENDER_URL}/pay/confirm"
 
             supabase.table("payments").insert({
@@ -1241,28 +1356,17 @@ def handle_message(event):
                 "status": "pending"
             }).execute()
 
-            # ✅ 同步呼叫，不用 asyncio.run
-            payment_url, transaction_id = create_payment(
-                user_id=line_user_id,
-                amount=300,
-                order_id=order_id,
-                product_name="星運導航・月訂閱",
-                confirm_url=confirm_url
-            )
-
-            supabase.table("payments").update({
-                "transaction_id": str(transaction_id)
-            }).eq("order_id", order_id).execute()
+            pay_url = f"{RENDER_URL}/pay/go/{order_id}"
 
             reply_text = (
                 "👑 月訂閱・星運令 NT$300／月\n\n"
                 "請點以下連結完成付款：\n"
-                f"{payment_url}\n\n"
+                f"{pay_url}\n\n"
                 "付款完成後老師會立即為您開通 🌟"
             )
         except Exception as e:
-            print(f"[LINE PAY 建立付款錯誤] {e}")
-            reply_text = "✨ 付款連結建立失敗，請稍後再試或聯繫客服 🙏"
+            print(f"[綠界建立付款錯誤] {e}")
+            reply_text = "✨ 付款連結建立失敗，請稍後再試 🙏"
 
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
