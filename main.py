@@ -984,6 +984,7 @@ def health_check():
     return "OK", 200
 
 
+# ✅ 修正：/shop 頁面加上真正可點的付款按鈕
 @app.route("/shop", methods=["GET"])
 def shop_page():
     return """
@@ -997,27 +998,96 @@ def shop_page():
     h2{color:#6B4FA0;}
     .item{background:#fff;border-radius:12px;padding:20px;margin:16px auto;max-width:360px;
           box-shadow:0 2px 8px rgba(107,79,160,0.15);}
-    .price{color:#6B4FA0;font-weight:bold;font-size:1.2em;}
-    .hint{color:#888;font-size:0.85em;margin-top:8px;}
+    .price{color:#6B4FA0;font-weight:bold;font-size:1.2em;margin:8px 0;}
+    .hint{color:#888;font-size:0.85em;margin-top:4px;}
+    .btn{display:block;margin:12px auto 0;padding:12px 0;width:100%;max-width:280px;
+         background:#6B4FA0;color:#fff;border:none;border-radius:8px;
+         font-size:1em;font-weight:bold;cursor:pointer;text-decoration:none;}
+    .btn:hover{background:#4A3080;}
+    .btn-sub{background:#B8860B;}
+    .btn-sub:hover{background:#7B3F00;}
   </style>
 </head>
 <body>
   <h2>🔮 星運導航・商店</h2>
-  <p>請在 LINE 中輸入對應指令完成購買</p>
+  <p style="color:#888;font-size:0.9em;">點選方案後將跳轉至綠界安全付款頁面</p>
+
   <div class="item">
     <div>👑 月訂閱・星運令</div>
     <div class="price">NT$300 / 月</div>
-    <div class="hint">每月 15 次靈性占卜額度<br>在 LINE 傳送「訂閱」即可付款</div>
+    <div class="hint">每月 15 次靈性占卜額度，每月1號自動重置</div>
+    <a class="btn btn-sub" href="/shop/pay?pkg=monthly">👑 立即訂閱 NT$300</a>
   </div>
+
   <div class="item">
-    <div>🆘 急救占卜代幣包</div>
-    <div class="price">NT$500 起</div>
-    <div class="hint">在 LINE 傳送「購買代幣」查看方案</div>
+    <div>🌱 入門包</div>
+    <div class="price">NT$500 → 3 枚代幣</div>
+    <div class="hint">第一步踏入星盤，命運從這裡開始轉動</div>
+    <a class="btn" href="/shop/pay?pkg=starter">🌱 購買入門包 NT$500</a>
   </div>
+
+  <div class="item">
+    <div>💫 超值包</div>
+    <div class="price">NT$1,200 → 8 枚代幣</div>
+    <div class="hint">最受歡迎！平均每次只要 $150，星辰常伴左右</div>
+    <a class="btn" href="/shop/pay?pkg=value">💫 購買超值包 NT$1,200</a>
+  </div>
+
+  <div class="item">
+    <div>🌌 豪華包</div>
+    <div class="price">NT$2,000 → 15 枚代幣</div>
+    <div class="hint">深度陪伴，讓老師全年守護你的每個轉折</div>
+    <a class="btn" href="/shop/pay?pkg=premium">🌌 購買豪華包 NT$2,000</a>
+  </div>
+
   <p style="color:#aaa;font-size:0.8em;margin-top:32px;">© 星運導航 2026</p>
 </body>
 </html>
 """, 200
+
+
+# ✅ 新增：/shop/pay 路由 — 從網頁按鈕建立付款訂單
+@app.route("/shop/pay", methods=["GET"])
+def shop_pay():
+    pkg_key = request.args.get("pkg", "")
+    line_user_id = request.args.get("uid", "")  # 預留，目前從 URL 帶入
+
+    pkg_map = {
+        "monthly": {"amount": 300,  "tokens": 0,  "name": "monthly",  "label": "月訂閱・星運令"},
+        "starter":  {"amount": 500,  "tokens": 3,  "name": "入門包",   "label": "入門包"},
+        "value":    {"amount": 1200, "tokens": 8,  "name": "超值包",   "label": "超值包"},
+        "premium":  {"amount": 2000, "tokens": 15, "name": "豪華包",   "label": "豪華包"},
+    }
+
+    pkg = pkg_map.get(pkg_key)
+    if not pkg:
+        return "找不到方案", 404
+
+    try:
+        order_id = str(uuid.uuid4()).replace("-", "")[:20]
+        supabase.table("payments").insert({
+            "user_id": line_user_id or "web_unknown",
+            "order_id": order_id,
+            "amount": pkg["amount"],
+            "currency": "TWD",
+            "package_type": pkg["name"],
+            "tokens_to_add": pkg["tokens"],
+            "status": "pending"
+        }).execute()
+
+        confirm_url = f"{RENDER_URL}/pay/confirm"
+        html, _ = ecpay_create(
+            user_id=line_user_id or "web_unknown",
+            amount=pkg["amount"],
+            order_id=order_id,
+            product_name=f"星運導航・{pkg['label']}",
+            confirm_url=confirm_url
+        )
+        return html
+
+    except Exception as e:
+        print(f"[shop_pay 錯誤] {e}")
+        return "付款建立失敗，請返回重試 🙏", 500
 
 
 @app.route("/push-now", methods=["GET"])
@@ -1030,46 +1100,6 @@ def push_now():
 def trigger_reset():
     reset_monthly_subscription()
     return "月訂閱重置已觸發", 200
-
-
-# ══════════════════════════════════════════
-#  ⚠️ 除錯路由（確認後請刪除！）
-# ══════════════════════════════════════════
-
-@app.route("/debug-ecpay", methods=["GET"])
-def debug_ecpay():
-    merchant_id = os.environ.get("ECPAY_MERCHANT_ID", "未設定")
-    hash_key = os.environ.get("ECPAY_HASH_KEY", "未設定")
-    hash_iv = os.environ.get("ECPAY_HASH_IV", "未設定")
-    hk_display = f"{hash_key[:4]}...{hash_key[-4:]}" if len(hash_key) > 8 else hash_key
-    hiv_display = f"{hash_iv[:4]}...{hash_iv[-4:]}" if len(hash_iv) > 8 else hash_iv
-    return f"""
-    <html><body style="font-family:monospace;padding:40px;background:#F8F4FF;">
-    <h2>🔍 ECPay 環境變數檢查</h2>
-    <table border="1" cellpadding="10" style="border-collapse:collapse;">
-      <tr><th>變數名稱</th><th>值（部分遮蔽）</th><th>長度</th><th>狀態</th></tr>
-      <tr>
-        <td>ECPAY_MERCHANT_ID</td>
-        <td>{merchant_id}</td>
-        <td>{len(merchant_id)}</td>
-        <td>{"✅ 正常" if len(merchant_id) == 7 else "⚠️ 長度異常（應為7碼）"}</td>
-      </tr>
-      <tr>
-        <td>ECPAY_HASH_KEY</td>
-        <td>{hk_display}</td>
-        <td>{len(hash_key)}</td>
-        <td>{"✅ 正常" if len(hash_key) == 20 else "⚠️ 長度異常（應為20碼）"}</td>
-      </tr>
-      <tr>
-        <td>ECPAY_HASH_IV</td>
-        <td>{hiv_display}</td>
-        <td>{len(hash_iv)}</td>
-        <td>{"✅ 正常" if len(hash_iv) == 16 else "⚠️ 長度異常（應為16碼）"}</td>
-      </tr>
-    </table>
-    <p style="color:red;margin-top:20px;">⚠️ 確認完畢後請立即刪除此路由！</p>
-    </body></html>
-    """, 200
 
 
 # ══════════════════════════════════════════
