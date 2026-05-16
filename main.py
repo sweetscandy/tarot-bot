@@ -13,9 +13,28 @@ from linebot.v3.exceptions import InvalidSignatureError
 from groq import Groq
 from supabase import create_client
 from ecpay import create_payment as ecpay_create, verify_notify, is_payment_success
-import os, random, datetime, pytz, threading, uuid
+import os, random, datetime, pytz, threading, uuid, time
+import requests
 
 app = Flask(__name__)
+
+# ══════════════════════════════════════════
+#  自我 ping — 防止 Render 休眠
+# ══════════════════════════════════════════
+def _keep_alive():
+    """每 5 分鐘自我 ping，防止 Render 免費方案休眠"""
+    time.sleep(60)  # 等待啟動完成
+    while True:
+        try:
+            url = os.environ.get("RENDER_URL", "https://tarot-bot-qqgg.onrender.com")
+            res = requests.get(f"{url}/", timeout=10)
+            print(f"[Keep-Alive] {datetime.datetime.now()} → {res.status_code}")
+        except Exception as e:
+            print(f"[Keep-Alive] Ping 失敗：{e}")
+        time.sleep(5 * 60)  # 每 5 分鐘 ping 一次
+
+_ping_thread = threading.Thread(target=_keep_alive, daemon=True)
+_ping_thread.start()
 
 configuration = Configuration(access_token=os.environ.get("LINE_ACCESS_TOKEN"))
 handler = WebhookHandler(os.environ.get("LINE_CHANNEL_SECRET"))
@@ -238,20 +257,18 @@ def _activate_subscription(order_id):
             return
         payment = result.data[0]
         if payment.get("status") == "confirmed":
-            return  # 已處理過，跳過
+            return
 
         line_user_id = payment["user_id"]
         package_type = payment.get("package_type", "monthly")
         tz = pytz.timezone("Asia/Taipei")
         now = datetime.datetime.now(tz)
 
-        # 先標記已確認，防止重複觸發
         supabase.table("payments").update({
             "status": "confirmed",
             "confirmed_at": now.isoformat()
         }).eq("order_id", order_id).execute()
 
-        # ── 月訂閱 ──
         if package_type == "monthly":
             expires_at = now + datetime.timedelta(days=30)
             supabase.table("users").update({
@@ -275,8 +292,6 @@ def _activate_subscription(order_id):
                 f"📅 訂閱到期日：{expires_at.date()}\n\n"
                 "老師已準備好，隨時為您指引星途 🔮"
             )
-
-        # ── 代幣包 ──
         else:
             tokens_to_add = payment.get("tokens_to_add") or 0
             if tokens_to_add > 0:
@@ -984,7 +999,6 @@ def health_check():
     return "OK", 200
 
 
-# ✅ 修正：/shop 頁面加上真正可點的付款按鈕
 @app.route("/shop", methods=["GET"])
 def shop_page():
     return """
@@ -1046,11 +1060,10 @@ def shop_page():
 """, 200
 
 
-# ✅ 新增：/shop/pay 路由 — 從網頁按鈕建立付款訂單
 @app.route("/shop/pay", methods=["GET"])
 def shop_pay():
     pkg_key = request.args.get("pkg", "")
-    line_user_id = request.args.get("uid", "")  # 預留，目前從 URL 帶入
+    line_user_id = request.args.get("uid", "")
 
     pkg_map = {
         "monthly": {"amount": 300,  "tokens": 0,  "name": "monthly",  "label": "月訂閱・星運令"},
