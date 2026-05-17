@@ -43,7 +43,7 @@ supabase = create_client(os.environ.get("SUPABASE_URL"), os.environ.get("SUPABAS
 
 RENDER_URL = os.environ.get("RENDER_URL", "https://tarot-bot-qqgg.onrender.com")
 FREE_READING_LIMIT = 3
-SHOP_URL = "https://tarot-bot-qqgg.onrender.com/shop"
+SHOP_URL = "https://crystal-shop-62a69.web.app/index.html"  # ✅ 已更新飾品商店連結
 
 TAROT_CARDS = [
     "愚者", "魔術師", "女祭司", "女皇", "皇帝", "教皇", "戀人", "戰車",
@@ -843,7 +843,7 @@ def build_vip_flex(referral_code=""):
                 {"type": "button", "style": "primary", "color": "#6B4FA0",
                  "action": {"type": "message", "label": "✨ 購買代幣包", "text": "購買代幣"}},
                 {"type": "button", "style": "secondary",
-                 "action": {"type": "message", "label": "📤 分享我的推薦碼", "text": "我的推薦碼"}}
+                 "action": {"type": "uri", "label": "🛍️ 前往飾品商店", "uri": SHOP_URL}}
             ]
         }
     }
@@ -894,7 +894,9 @@ def build_settings_flex(user):
                      "initial": "1995-01-01", "min": "1924-01-01", "max": "2010-12-31"
                  }},
                 {"type": "button", "style": "secondary",
-                 "action": {"type": "message", "label": "🔔 推播設定", "text": "推播設定"}}
+                 "action": {"type": "message", "label": "🔔 推播設定", "text": "推播設定"}},
+                {"type": "button", "style": "secondary",
+                 "action": {"type": "uri", "label": "🛍️ 飾品商店", "uri": SHOP_URL}}
             ]
         }
     }
@@ -980,7 +982,9 @@ def build_daily_flex(card, orientation, reading, zodiac, today_str):
             "type": "box", "layout": "vertical",
             "contents": [
                 {"type": "button", "style": "secondary", "color": "#6B4FA0",
-                 "action": {"type": "message", "label": "🆘 急救占卜", "text": "急救占卜"}}
+                 "action": {"type": "message", "label": "🆘 急救占卜", "text": "急救占卜"}},
+                {"type": "button", "style": "secondary",
+                 "action": {"type": "uri", "label": "🛍️ 查看開運飾品", "uri": SHOP_URL}}
             ]
         }
     }
@@ -1001,63 +1005,8 @@ def health_check():
 
 @app.route("/shop", methods=["GET"])
 def shop_page():
-    return """
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>星運導航・商店</title>
-  <style>
-    body{font-family:sans-serif;text-align:center;padding:40px;background:#F8F4FF;color:#333;}
-    h2{color:#6B4FA0;}
-    .item{background:#fff;border-radius:12px;padding:20px;margin:16px auto;max-width:360px;
-          box-shadow:0 2px 8px rgba(107,79,160,0.15);}
-    .price{color:#6B4FA0;font-weight:bold;font-size:1.2em;margin:8px 0;}
-    .hint{color:#888;font-size:0.85em;margin-top:4px;}
-    .btn{display:block;margin:12px auto 0;padding:12px 0;width:100%;max-width:280px;
-         background:#6B4FA0;color:#fff;border:none;border-radius:8px;
-         font-size:1em;font-weight:bold;cursor:pointer;text-decoration:none;}
-    .btn:hover{background:#4A3080;}
-    .btn-sub{background:#B8860B;}
-    .btn-sub:hover{background:#7B3F00;}
-  </style>
-</head>
-<body>
-  <h2>🔮 星運導航・商店</h2>
-  <p style="color:#888;font-size:0.9em;">點選方案後將跳轉至綠界安全付款頁面</p>
-
-  <div class="item">
-    <div>👑 月訂閱・星運令</div>
-    <div class="price">NT$300 / 月</div>
-    <div class="hint">每月 15 次靈性占卜額度，每月1號自動重置</div>
-    <a class="btn btn-sub" href="/shop/pay?pkg=monthly">👑 立即訂閱 NT$300</a>
-  </div>
-
-  <div class="item">
-    <div>🌱 入門包</div>
-    <div class="price">NT$500 → 3 枚代幣</div>
-    <div class="hint">第一步踏入星盤，命運從這裡開始轉動</div>
-    <a class="btn" href="/shop/pay?pkg=starter">🌱 購買入門包 NT$500</a>
-  </div>
-
-  <div class="item">
-    <div>💫 超值包</div>
-    <div class="price">NT$1,200 → 8 枚代幣</div>
-    <div class="hint">最受歡迎！平均每次只要 $150，星辰常伴左右</div>
-    <a class="btn" href="/shop/pay?pkg=value">💫 購買超值包 NT$1,200</a>
-  </div>
-
-  <div class="item">
-    <div>🌌 豪華包</div>
-    <div class="price">NT$2,000 → 15 枚代幣</div>
-    <div class="hint">深度陪伴，讓老師全年守護你的每個轉折</div>
-    <a class="btn" href="/shop/pay?pkg=premium">🌌 購買豪華包 NT$2,000</a>
-  </div>
-
-  <p style="color:#aaa;font-size:0.8em;margin-top:32px;">© 星運導航 2026</p>
-</body>
-</html>
-""", 200
+    from flask import redirect
+    return redirect(SHOP_URL)
 
 
 @app.route("/shop/pay", methods=["GET"])
@@ -1695,6 +1644,14 @@ def handle_message(event):
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
                 reply_token=event.reply_token,
                 messages=[TextMessage(text=reply_text)]
+            ))
+        return
+
+    elif user_msg in ["飾品商店", "開運商店", "商店"]:
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[TextMessage(text=f"🛍️ 星運導航・開運飾品商店\n\n點此前往查看專屬開運物 ✨\n{SHOP_URL}")]
             ))
         return
 
