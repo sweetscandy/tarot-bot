@@ -1371,8 +1371,6 @@ def build_vip_flex(referral_code=""):
         "footer": {
             "type": "box", "layout": "vertical", "spacing": "sm",
             "contents": [
-                {"type": "button", "style": "primary", "color": "#B8860B",
-                 "action": {"type": "message", "label": "👑 立即訂閱 NT$300／月", "text": "訂閱"}},
                 {"type": "button", "style": "primary", "color": "#6B4FA0",
                  "action": {"type": "message", "label": "✨ 購買代幣包", "text": "購買代幣"}},
                 {"type": "button", "style": "secondary",
