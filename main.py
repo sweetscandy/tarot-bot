@@ -1249,11 +1249,6 @@ def build_vip_flex(referral_code=""):
         "body": {
             "type": "box", "layout": "vertical", "spacing": "sm",
             "contents": [
-                {"type": "text", "text": "✨ VIP 專屬權益", "weight": "bold", "color": "#7B3F00", "size": "sm"},
-                {"type": "text", "text": "• 每月 15 次靈性占卜額度", "color": "#555555", "size": "sm"},
-                {"type": "text", "text": "• 每日專屬星座深度解析", "color": "#555555", "size": "sm"},
-                {"type": "text", "text": "• 🛍️ 專屬高階幸運物 9 折優惠", "color": "#B8860B", "size": "sm", "weight": "bold"},
-                {"type": "separator"},
                 {"type": "text", "text": "🔮 代幣包方案", "weight": "bold", "color": "#7B3F00", "size": "sm"},
                 {"type": "text", "text": "✨ 星塵入門包　$500 → 3 顆", "color": "#555555", "size": "xs"},
                 {"type": "text", "text": "🌙 月光超值包　$1,200 → 8 顆", "color": "#555555", "size": "xs"},
