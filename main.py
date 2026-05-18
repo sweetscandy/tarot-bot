@@ -1539,7 +1539,7 @@ def health_check():
 @app.route("/shop", methods=["GET"])
 def shop_page():
     from flask import redirect
-    return redirect(SHOP_URL)
+    return redirect("https://crystal-shop-62a69.web.app/index.html", code=301)
 
 
 @app.route("/push-now", methods=["GET"])
