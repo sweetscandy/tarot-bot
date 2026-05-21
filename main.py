@@ -44,9 +44,6 @@ RENDER_URL = os.environ.get("RENDER_URL", "https://tarot-bot-qqgg.onrender.com")
 FREE_READING_LIMIT = 3
 SHOP_URL = "https://crystal-shop-62a69.web.app/index.html"
 
-# ══════════════════════════════════════════
-#  常數
-# ══════════════════════════════════════════
 TAROT_CARDS = [
     "愚者", "魔術師", "女祭司", "女皇", "皇帝", "教皇", "戀人", "戰車",
     "力量", "隱者", "命運之輪", "正義", "倒吊人", "死神", "節制", "惡魔",
@@ -104,7 +101,12 @@ WAITING_MSGS_SPIRITUAL = [
     "💫 靈魂之書正在為您翻開...\n\n老師正在解讀您的靈性課題，請稍候約 3 分鐘 🕯️",
 ]
 
-# ══ 求籤問卜常數 ══
+WAITING_MSGS_WEEKLY = [
+    "🌟 老師正在為您解讀本週星圖能量...\n\n一週運勢需要整合七日氣場，請靜心等待約 1 分鐘 ✨",
+    "📅 星辰正在為您排列本週命運之書...\n\n老師正在仔細推演，請稍候約 1 分鐘 🔮",
+    "🌙 本週的星象正在凝聚中...\n\n老師將為您帶來完整一週指引，請靜心等待約 1 分鐘 💫",
+]
+
 FORTUNE_STICK_CATEGORIES = {
     "愛情":   ["感情現況如何？", "對方對我有意思嗎？", "這段感情值得繼續嗎？", "何時能遇到對的人？", "分手後還有復合機會嗎？"],
     "事業學業": ["工作轉換時機到了嗎？", "升遷機會近了嗎？", "創業適合現在嗎？", "考試能順利通過嗎？", "目前的努力方向正確嗎？"],
@@ -266,7 +268,7 @@ def check_free_reading_quota(line_user_id, user):
         msg = (
             f"🔮 您本月 {FREE_READING_LIMIT} 次免費占卜已用完囉～\n\n"
             "老師還想繼續為您指引：\n"
-            "💎 消耗 1 顆代幣，繼續今日占卜\n"
+            "💎 消耗 1 顆代幣，繼續占卜\n"
             "🌌 靈性占卜 / 急救占卜 消耗 2 顆代幣\n\n"
             "輸入「購買代幣」補充代幣 🌙"
         )
@@ -383,12 +385,10 @@ def _activate_subscription(order_id, payment):
         package_type = payment.get("package_type", "monthly")
         tz = pytz.timezone("Asia/Taipei")
         now = datetime.datetime.now(tz)
-
         supabase.table("payments").update({
             "status": "confirmed",
             "confirmed_at": now.isoformat()
         }).eq("order_id", order_id).execute()
-
         tokens_to_add = payment.get("tokens_to_add") or 0
         if tokens_to_add > 0:
             user = get_or_create_user(line_user_id)
@@ -423,14 +423,11 @@ def _activate_single_service(order_id, order):
         product_type = order["product_type"]
         tz = pytz.timezone("Asia/Taipei")
         now = datetime.datetime.now(tz)
-
         supabase.table("orders").update({
             "status": "paid",
             "paid_at": now.isoformat()
         }).eq("order_id", order_id).execute()
-
         create_service(line_user_id, product_type, order_id)
-
         service_names = {
             "double_chart": "💑 雙人合盤解析",
             "year_fortune": "📅 流年運勢報告",
@@ -625,6 +622,98 @@ def do_reading_async(line_user_id, user_msg, reading_type, is_deep, zodiac, user
 
 
 # ══════════════════════════════════════════
+#  ★ 一週運勢核心（背景執行）★
+# ══════════════════════════════════════════
+
+def _run_weekly_fortune_background(line_user_id, reading_type, zodiac, user):
+    try:
+        tz = pytz.timezone("Asia/Taipei")
+        now = datetime.datetime.now(tz)
+        week_start = now - datetime.timedelta(days=now.weekday())
+        week_end = week_start + datetime.timedelta(days=6)
+        week_str = f"{week_start.strftime('%m/%d')}～{week_end.strftime('%m/%d')}"
+        birth = user.get("birth_date", "未知") if user else "未知"
+        zodiac_hint = f"使用者的星座是【{zodiac}】，請融入星座特質。\n" if zodiac else ""
+
+        if reading_type == "tarot":
+            day_names = ["一", "二", "三", "四", "五", "六", "日"]
+            cards = []
+            for i in range(7):
+                card = random.choice(TAROT_CARDS)
+                orientation = "逆位" if random.choice([True, False]) else "正位"
+                cards.append(f"週{day_names[i]}：{card}（{orientation}）")
+            cards_str = "\n".join(cards)
+            user_prompt = f"""{zodiac_hint}請為使用者進行本週（{week_str}）塔羅一週運勢解讀。
+每日牌卡如下：
+{cards_str}
+
+請給出約350字的一週運勢總覽，包含：
+- 本週整體能量走向（2~3句）
+- 感情運（1~2句）
+- 事業工作運（1~2句）
+- 財運（1句）
+- 本週幸運提示（1句）
+語氣溫柔有詩意，像老師給學生的週一早安叮嚀。"""
+            prefix = f"🃏 本週塔羅運勢｜{week_str}\n\n"
+
+        elif reading_type == "bazi":
+            user_prompt = f"""{zodiac_hint}使用者生辰：{birth}
+請以八字命理角度，給出本週（{week_str}）的一週運勢解讀，約350字，包含：
+- 本週整體氣場與能量
+- 感情運勢提示
+- 事業財運走向
+- 本週需注意事項
+- 開運小建議
+語氣溫柔神秘，像老師給學生的週一叮嚀。"""
+            prefix = f"🀄 本週八字運勢｜{week_str}\n\n"
+
+        elif reading_type == "iching":
+            hexagram = random.choice(ICHING_HEXAGRAMS)
+            user_prompt = f"""{zodiac_hint}本週（{week_str}）起卦得【{hexagram}】。
+請以易經卦象角度，給出約350字的一週運勢解讀，包含：
+- 卦象本週寓意
+- 感情運勢
+- 事業財運
+- 本週行動建議
+- 一句鼓勵結語
+語氣溫柔神秘，像老師給學生的週一叮嚀。"""
+            prefix = f"☯️ 本週易經運勢｜{week_str}\n\n卦象：【{hexagram}】\n\n"
+
+        else:
+            return
+
+        chat_completion = groq_client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt}
+            ],
+            model="llama-3.3-70b-versatile",
+        )
+        response_text = chat_completion.choices[0].message.content
+
+        try:
+            supabase.table("tarot_logs").insert({
+                "line_user_id": line_user_id,
+                "card_name": f"一週運勢｜{reading_type}",
+                "reading": response_text,
+                "category": "一週運勢",
+                "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
+            }).execute()
+        except Exception as e:
+            print(f"[一週運勢 tarot_logs 寫入錯誤] {e}")
+
+        if user:
+            increment_free_reading(line_user_id, user)
+
+        footer = get_lucky_item_text()
+        push_text(line_user_id, prefix + response_text + footer)
+
+    except Exception as e:
+        print(f"[一週運勢背景錯誤] {line_user_id}: {e}")
+        push_text(line_user_id, "✨ 星辰訊號有些微干擾，請再傳一次訊息給老師 🙏")
+
+
+# ══════════════════════════════════════════
 #  靈性占卜核心（背景執行）
 # ══════════════════════════════════════════
 
@@ -672,10 +761,7 @@ def _run_spiritual_background(line_user_id, data, zodiac):
             print(f"tarot_logs 寫入錯誤: {e}")
 
         footer = get_lucky_item_text()
-        push_text(
-            line_user_id,
-            f"🌌 靈性占卜解讀\n\n{response_text}{footer}"
-        )
+        push_text(line_user_id, f"🌌 靈性占卜解讀\n\n{response_text}{footer}")
 
     except Exception as e:
         print(f"[靈性占卜背景錯誤] {line_user_id}: {e}")
@@ -688,7 +774,6 @@ def _run_spiritual_background(line_user_id, data, zodiac):
 
 def _run_fortune_stick_background(line_user_id, category, question, stick):
     try:
-        # 靜默等待 12~15 秒，模擬真實求籤體驗
         time.sleep(random.uniform(12, 15))
 
         user_prompt = f"""請進行求籤解析：
@@ -1031,6 +1116,39 @@ def build_shichen_flex():
     return FlexMessage(alt_text="請選擇出生時辰", contents=FlexContainer.from_dict(flex_content))
 
 
+# ★ 一週運勢選單 Flex ★
+def build_weekly_type_select_flex():
+    flex_content = {
+        "type": "bubble",
+        "styles": {"header": {"backgroundColor": "#2D1B69"}, "body": {"backgroundColor": "#F8F4FF"}},
+        "header": {
+            "type": "box", "layout": "vertical",
+            "contents": [
+                {"type": "text", "text": "🌟 一週運勢", "color": "#FFFFFF", "weight": "bold", "size": "lg"},
+                {"type": "text", "text": "選擇您想要的占卜方式\n老師將為您解讀本週完整能量 ✨", "color": "#C9B8FF", "size": "xs", "wrap": True}
+            ]
+        },
+        "body": {
+            "type": "box", "layout": "vertical", "spacing": "sm",
+            "contents": [
+                {"type": "button", "style": "primary", "color": "#6B4FA0",
+                 "action": {"type": "postback", "label": "🃏 塔羅一週運勢", "data": "weekly_tarot"}},
+                {"type": "button", "style": "primary", "color": "#4A3080",
+                 "action": {"type": "postback", "label": "🀄 八字一週運勢", "data": "weekly_bazi"}},
+                {"type": "button", "style": "primary", "color": "#2D1B69",
+                 "action": {"type": "postback", "label": "☯️ 易經一週運勢", "data": "weekly_iching"}}
+            ]
+        },
+        "footer": {
+            "type": "box", "layout": "vertical",
+            "contents": [
+                {"type": "text", "text": "💎 消耗 1 次免費額度或 1 顆代幣", "color": "#AAAAAA", "size": "xs", "align": "center"}
+            ]
+        }
+    }
+    return FlexMessage(alt_text="一週運勢 - 選擇占卜方式", contents=FlexContainer.from_dict(flex_content))
+
+
 def build_type_select_flex(mode="daily"):
     if mode == "daily":
         title = "🌙 今日運勢"
@@ -1233,7 +1351,7 @@ def build_token_flex(tokens, used, subscription_type="free"):
                 ]},
                 {"type": "separator"},
                 {"type": "text", "text": "代幣用途：", "color": "#888888", "size": "xs", "weight": "bold"},
-                {"type": "text", "text": "🌙 今日運勢（額度用完）1 顆｜🌌 靈性占卜 2 顆｜🆘 急救占卜 2 顆｜🎋 求籤問卜 1 顆", "color": "#AAAAAA", "size": "xs", "wrap": True},
+                {"type": "text", "text": "🌟 一週運勢（額度用完）1 顆｜🌌 靈性占卜 2 顆｜🆘 急救占卜 2 顆｜🎋 求籤問卜 1 顆", "color": "#AAAAAA", "size": "xs", "wrap": True},
                 {"type": "separator"},
                 {"type": "text", "text": "代幣獲取方式：", "color": "#888888", "size": "xs", "weight": "bold"},
                 {"type": "text", "text": "每月自動補充 1 顆 🌙", "color": "#AAAAAA", "size": "xs"},
@@ -1280,7 +1398,7 @@ def build_token_shop_flex():
                 {"type": "text", "text": "深度陪伴，讓老師全年守護你的每個轉折", "color": "#888888", "size": "xs", "wrap": True},
                 {"type": "separator"},
                 {"type": "text", "text": "💡 代幣用途", "color": "#888888", "size": "xs", "weight": "bold"},
-                {"type": "text", "text": "🌙 今日運勢（額度用完）1 顆｜🌌 靈性占卜 2 顆｜🆘 急救占卜 2 顆｜🎋 求籤問卜 1 顆", "color": "#AAAAAA", "size": "xs", "wrap": True},
+                {"type": "text", "text": "🌟 一週運勢（額度用完）1 顆｜🌌 靈性占卜 2 顆｜🆘 急救占卜 2 顆｜🎋 求籤問卜 1 顆", "color": "#AAAAAA", "size": "xs", "wrap": True},
             ]
         },
         "footer": {
@@ -1561,7 +1679,6 @@ def ecpay_go(order_id):
                 confirm_url=confirm_url
             )
             return html
-
         result2 = supabase.table("orders").select("*").eq("order_id", order_id).execute()
         if result2.data:
             order = result2.data[0]
@@ -1580,9 +1697,7 @@ def ecpay_go(order_id):
                 confirm_url=confirm_url
             )
             return html
-
         return "找不到訂單", 404
-
     except Exception as e:
         print(f"[ecpay_go 錯誤] {e}")
         return "伺服器錯誤，請返回 LINE 重新操作", 500
@@ -1614,7 +1729,6 @@ def ecpay_confirm():
         else:
             rtn_code = request.args.get("RtnCode", "")
             order_id = request.args.get("MerchantTradeNo", "")
-
         if rtn_code == "1" and order_id:
             _activate_payment(order_id)
             return """<html>
@@ -1701,8 +1815,6 @@ def handle_follow(event):
         "請輸入「推薦碼 XXXXXX」\n"
         "讓好友獲得代幣獎勵 💎"
     )
-
-
 # ══════════════════════════════════════════
 #  訊息處理
 # ══════════════════════════════════════════
@@ -1926,11 +2038,12 @@ def handle_message(event):
 
     # ══ 一般指令處理 ══
 
-    if user_msg in ["今日運勢", "運勢"]:
+    # ★ 一週運勢（選單第1格）★
+    if user_msg in ["一週運勢"]:
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
                 reply_token=event.reply_token,
-                messages=[build_type_select_flex(mode="daily")]
+                messages=[build_weekly_type_select_flex()]
             ))
         return
 
@@ -2391,7 +2504,7 @@ def handle_message(event):
     elif user_msg in ["說明", "使用說明", "help", "Help"]:
         reply_text = (
             "🔮 星運導航使用說明\n\n"
-            "🌙 今日運勢 → 塔羅／八字／易經每日解讀\n"
+            "🌟 一週運勢 → 塔羅／八字／易經本週完整解讀\n"
             "（每月 3 次免費，額度用完消耗 1 顆代幣）\n\n"
             "🔮 占卜服務 → 靈性占卜／急救占卜（各 2 顆代幣）\n\n"
             "🎋 求籤問卜 → 五大類別誠心問卜（1 顆代幣）\n\n"
@@ -2452,20 +2565,68 @@ def handle_message(event):
 def handle_postback(event):
     line_user_id = event.source.user_id
     data = event.postback.data
+    user = get_or_create_user(line_user_id)
+    zodiac = get_zodiac(user.get("birth_date")) if user.get("birth_date") else None
 
     type_map = {
-        "daily_tarot":  ("daily", "tarot"),
-        "daily_bazi":   ("daily", "bazi"),
-        "daily_iching": ("daily", "iching"),
-        "deep_tarot":   ("deep",  "tarot"),
-        "deep_bazi":    ("deep",  "bazi"),
-        "deep_iching":  ("deep",  "iching"),
+        "daily_tarot":   ("daily",  "tarot"),
+        "daily_bazi":    ("daily",  "bazi"),
+        "daily_iching":  ("daily",  "iching"),
+        "deep_tarot":    ("deep",   "tarot"),
+        "deep_bazi":     ("deep",   "bazi"),
+        "deep_iching":   ("deep",   "iching"),
+        "weekly_tarot":  ("weekly", "tarot"),
+        "weekly_bazi":   ("weekly", "bazi"),
+        "weekly_iching": ("weekly", "iching"),
     }
 
     if data in type_map:
         mode, reading_type = type_map[data]
         type_names = {"tarot": "塔羅", "bazi": "八字", "iching": "易經"}
         type_name = type_names[reading_type]
+
+        # ★ 一週運勢：直接執行，不需要輸入問題 ★
+        if mode == "weekly":
+            can_read, quota_msg = check_free_reading_quota(line_user_id, user)
+            if not can_read:
+                fresh = supabase.table("users").select("tokens").eq("line_user_id", line_user_id).execute()
+                current_tokens = fresh.data[0].get("tokens", 0) if fresh.data else 0
+                if current_tokens >= 1:
+                    use_tokens(line_user_id, 1, f"一週運勢（{type_name}）")
+                    wait_msg = random.choice(WAITING_MSGS_WEEKLY)
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=[TextMessage(text=f"💎 已消耗 1 顆代幣\n\n{wait_msg}")]
+                        ))
+                    t = threading.Thread(
+                        target=_run_weekly_fortune_background,
+                        args=(line_user_id, reading_type, zodiac, user),
+                        daemon=True
+                    )
+                    t.start()
+                else:
+                    with ApiClient(configuration) as api_client:
+                        MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                            reply_token=event.reply_token,
+                            messages=[TextMessage(text=quota_msg)]
+                        ))
+                return
+            wait_msg = random.choice(WAITING_MSGS_WEEKLY)
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=wait_msg)]
+                ))
+            t = threading.Thread(
+                target=_run_weekly_fortune_background,
+                args=(line_user_id, reading_type, zodiac, user),
+                daemon=True
+            )
+            t.start()
+            return
+
+        # daily / deep 原本邏輯
         ask_msg = (
             f"🆘 急救占卜｜{type_name}\n\n"
             f"請說出您此刻最想解答的問題，\n"
@@ -2531,7 +2692,6 @@ def handle_postback(event):
             ))
         return
 
-    # ══ 求籤問卜 Postback ══
     if data.startswith("fortune_cat_"):
         category = data.replace("fortune_cat_", "")
         with ApiClient(configuration) as api_client:
@@ -2650,5 +2810,3 @@ def handle_postback(event):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
-
