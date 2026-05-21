@@ -1989,7 +1989,7 @@ def build_token_shop_flex():
             "type": "box", "layout": "vertical", "spacing": "sm",
             "contents": [
                 {"type": "button", "style": "primary", "color": "#6B4FA0",
-                 "action": {"type": "message", "label": "✨ 星塵入門包 $500 → 3顆", "text": "購買星塵入門包"}},
+                 "action": {"type": "message",                           "label": "✨ 星塵入門包 $500 → 3顆", "text": "購買星塵入門包"}},
                 {"type": "button", "style": "primary", "color": "#4A3080",
                  "action": {"type": "message", "label": "🌙 月光超值包 $1,200 → 8顆", "text": "購買月光超值包"}},
                 {"type": "button", "style": "primary", "color": "#2D1B69",
@@ -3540,50 +3540,17 @@ def handle_message(event):
         return
 
     else:
-        # ★ 人生迷航決策指南子服務關鍵字保護 ★
-        navigation_keywords = [
-            "復合分析", "職場運勢", "財運分析",
-            "購買復合分析", "購買職場運勢", "購買財運分析",
-            "人生迷航決策指南", "占卜服務", "專屬天書",
-            "雙人合盤", "流年運勢", "紫微斗數",
-            "購買雙人合盤", "購買流年運勢", "購買紫微斗數",
+        # ★ 所有不認識的訊息 → 引導選單，絕不自動扣款 ★
+        guide_msgs = [
+            "親愛的，有什麼心事想跟老師說嗎？🌙\n\n請從下方選單選擇服務，老師隨時為您解讀 ✨\n\n輸入「說明」查看所有功能",
+            "老師在這裡陪著您 💫\n\n請點選下方選單，或輸入以下指令開始：\n🔮 占卜服務\n🧭 人生迷航決策指南\n📖 專屬天書",
+            "星辰正在等待您的問題 🌟\n\n請從選單選擇您需要的服務\n或輸入「說明」查看完整功能列表 ✨",
         ]
-        if user_msg in navigation_keywords:
-            with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[build_life_navigation_flex()]
-                ))
-            return
-
-        # 一般訊息 → 免費塔羅占卜
-        can_read, quota_msg = check_free_reading_quota(line_user_id, user)
-        if not can_read:
-            fresh = supabase.table("users").select("tokens").eq("line_user_id", line_user_id).execute()
-            current_tokens = fresh.data[0].get("tokens", 0) if fresh.data else 0
-            if current_tokens >= 1:
-                use_tokens(line_user_id, 1, "一般占卜（免費額度已用完）")
-                wait_msg = random.choice(WAITING_MSGS_TAROT)
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=[TextMessage(text=f"💎 已消耗 1 顆代幣（免費額度已用完）\n\n{wait_msg}")]
-                    ))
-                do_reading_async(line_user_id, user_msg, "tarot", False, zodiac, user)
-            else:
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=[TextMessage(text=quota_msg)]
-                    ))
-            return
-        wait_msg = random.choice(WAITING_MSGS_TAROT)
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
                 reply_token=event.reply_token,
-                messages=[TextMessage(text=wait_msg)]
+                messages=[TextMessage(text=random.choice(guide_msgs))]
             ))
-        do_reading_async(line_user_id, user_msg, "tarot", False, zodiac, user)
         return
 
 
@@ -3833,8 +3800,10 @@ def handle_postback(event):
 
 # ══════════════════════════════════════════
 #  啟動
-# ══════════════════════
+# ══════════════════════════════════════════
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
+
 
