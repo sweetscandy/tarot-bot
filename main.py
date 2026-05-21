@@ -54,7 +54,7 @@ FOLLOW_UP_LIMITS = {
     "double_chart": 1,
     "year_fortune":  1,
     "ziwei":         2,
-    "love_reading":  5,   # 復合分析：含第一題共5題
+    "love_reading":  5,
     "career":        2,
     "wealth":        1,
 }
@@ -84,7 +84,6 @@ LUCKY_ITEMS = [
     {"crystal": "拉長石手鍊", "element": "火", "weak_sign": "正處於人生轉變期，容易感到迷失方向", "effect": "神秘保護石，守護轉變期的您，引導走向正確道路"},
 ]
 
-# ══ 等待訊息 ══
 WAITING_MSGS_TAROT = [
     "🔮 老師正在為您洗牌、抽牌中，請靜心等待約 1 分鐘...\n\n牌卡的能量需要時間凝聚，請保持心靈平靜 🌙",
     "🃏 老師已感應到您的問題，正在與牌卡溝通中...\n\n請靜候約 1 分鐘，星辰正在為您排列答案 ✨",
@@ -123,14 +122,12 @@ WAITING_MSGS_WEEKLY = [
     "🌙 本週的星象正在凝聚中...\n\n老師將為您帶來完整一週指引，請靜心等待約 1 分鐘 💫",
 ]
 
-# ★ 新增：專屬天書等待訊息（約15分鐘）★
 WAITING_MSGS_TIANBOOK = [
     "📖 老師正在為您開啟命運密函...\n\n深度命盤解析需要仔細推算，約需 15 分鐘，請您耐心等候 🔮",
     "🌌 命盤的星辰正在一一排列...\n\n老師正在為您進行深度解讀，約需 15 分鐘，請先休息一下 ✨",
     "⭐ 老師已接收到您的命格訊息，正在仔細推演...\n\n這份專屬命盤報告約需 15 分鐘，請靜心等待 🕯️",
 ]
 
-# ★ 新增：人生迷航決策指南等待訊息 ★
 WAITING_MSGS_LOVE = [
     "💔 老師正在為您抽出這一題的牌卡...\n\n感情的答案需要靜心感應，請稍候約 1 分鐘 🌙",
     "🃏 牌卡正在為您的感情問題凝聚能量...\n\n請靜心等待約 1 分鐘，老師即將為您解讀 ✨",
@@ -295,15 +292,22 @@ def use_tokens(line_user_id, amount=2, reason="占卜消耗"):
 
 
 def add_tokens(line_user_id, amount, reason="管理員補充"):
-    user = get_or_create_user(line_user_id)
-    new_tokens = (user.get("tokens") or 0) + amount
-    supabase.table("users").update({"tokens": new_tokens}).eq("line_user_id", line_user_id).execute()
-    supabase.table("token_logs").insert({
-        "line_user_id": line_user_id,
-        "change": amount,
-        "reason": reason
-    }).execute()
-    return new_tokens
+    try:
+        result = supabase.table("users").select("tokens").eq("line_user_id", line_user_id).execute()
+        if not result.data:
+            return 0
+        current = result.data[0].get("tokens") or 0
+        new_tokens = current + amount
+        supabase.table("users").update({"tokens": new_tokens}).eq("line_user_id", line_user_id).execute()
+        supabase.table("token_logs").insert({
+            "line_user_id": line_user_id,
+            "change": amount,
+            "reason": reason
+        }).execute()
+        return new_tokens
+    except Exception as e:
+        print(f"[add_tokens 錯誤] {e}")
+        return 0
 
 
 def check_free_reading_quota(line_user_id, user):
@@ -399,7 +403,6 @@ def get_unused_service(line_user_id, service_type):
 
 
 def get_active_service(line_user_id, service_type):
-    """取得進行中（used但追問未超限）的服務"""
     result = supabase.table("services") \
         .select("*") \
         .eq("user_id", line_user_id) \
@@ -504,6 +507,7 @@ def _activate_single_service(order_id, order):
             "paid_at": now.isoformat()
         }).eq("order_id", order_id).execute()
         create_service(line_user_id, product_type, order_id)
+
         service_names = {
             "double_chart": "💑 雙人合盤解析",
             "year_fortune": "📅 流年運勢報告",
@@ -513,22 +517,114 @@ def _activate_single_service(order_id, order):
             "wealth":       "💰 財運分析",
         }
         service_label = service_names.get(product_type, product_type)
-        trigger_words = {
-            "double_chart": "雙人合盤",
-            "year_fortune": "流年運勢",
-            "ziwei":        "紫微斗數",
-            "love_reading": "復合分析",
-            "career":       "職場運勢",
-            "wealth":       "財運分析",
-        }
-        trigger = trigger_words.get(product_type, "")
-        push_text(
-            line_user_id,
-            f"🎉 付款成功！服務已開通！\n\n"
-            f"✨ {service_label}\n\n"
-            f"請輸入「{trigger}」開始進行解析\n"
-            f"老師會引導您一步一步完成 🔮"
-        )
+
+        svc = get_unused_service(line_user_id, product_type)
+        service_id = svc["service_id"] if svc else None
+
+        if product_type == "love_reading":
+            if service_id:
+                pending_state[line_user_id] = {
+                    "mode": "love_reading",
+                    "step": "question",
+                    "service_id": service_id,
+                    "question_num": 1
+                }
+            push_text(
+                line_user_id,
+                f"🎉 付款成功！{service_label}已開通！\n\n"
+                f"💔 老師將為您抽牌解讀感情狀況 🃏\n\n"
+                f"📝 請直接描述您的感情狀況或想問的問題\n\n"
+                f"例如：\n「我和前任分開 3 個月，對方最近突然聯絡我，復合機會大嗎？」\n\n"
+                f"💎 本服務共可提問 {FOLLOW_UP_LIMITS['love_reading']} 次"
+            )
+
+        elif product_type == "career":
+            if service_id:
+                pending_state[line_user_id] = {
+                    "mode": "career",
+                    "step": "birth",
+                    "service_id": service_id,
+                    "follow_up_num": 1,
+                    "data": {}
+                }
+            push_text(
+                line_user_id,
+                f"🎉 付款成功！{service_label}已開通！\n\n"
+                f"💼 老師將以八字命理為您解讀職場運勢 🔮\n\n"
+                f"請輸入您的出生日期：\n\n"
+                f"格式範例：\n1990-05-20\n1990/05/20\n1990年5月20日\n\n"
+                f"⚠️ 請使用西元國曆（陽曆）"
+            )
+
+        elif product_type == "wealth":
+            if service_id:
+                pending_state[line_user_id] = {
+                    "mode": "wealth",
+                    "step": "birth",
+                    "service_id": service_id,
+                    "follow_up_num": 1,
+                    "data": {}
+                }
+            push_text(
+                line_user_id,
+                f"🎉 付款成功！{service_label}已開通！\n\n"
+                f"💰 老師將以易經卦象為您解讀財運走向 🔮\n\n"
+                f"請輸入您的出生日期：\n\n"
+                f"格式範例：\n1990-05-20\n1990/05/20\n1990年5月20日\n\n"
+                f"⚠️ 請使用西元國曆（陽曆）"
+            )
+
+        elif product_type == "double_chart":
+            if service_id:
+                pending_state[line_user_id] = {
+                    "mode": "double_chart",
+                    "step": "birth1",
+                    "service_id": service_id,
+                    "data": {}
+                }
+            push_text(
+                line_user_id,
+                f"🎉 付款成功！{service_label}已開通！\n\n"
+                f"💑 老師將為您解讀兩人的命格相容性 🔮\n\n"
+                f"📅 請輸入甲方（您自己）的出生日期\n\n"
+                f"格式範例：\n1990-05-20\n1990/05/20\n1990年5月20日\n\n"
+                f"⚠️ 請使用西元國曆（陽曆）"
+            )
+
+        elif product_type == "year_fortune":
+            if service_id:
+                pending_state[line_user_id] = {
+                    "mode": "year_fortune",
+                    "step": "birth",
+                    "service_id": service_id,
+                    "data": {}
+                }
+            push_text(
+                line_user_id,
+                f"🎉 付款成功！{service_label}已開通！\n\n"
+                f"📅 老師將為您推演今年完整運勢 🔮\n\n"
+                f"請輸入您的出生日期：\n\n"
+                f"格式範例：\n1990-05-20\n1990/05/20\n1990年5月20日\n\n"
+                f"⚠️ 請使用西元國曆（陽曆）"
+            )
+
+        elif product_type == "ziwei":
+            if service_id:
+                pending_state[line_user_id] = {
+                    "mode": "ziwei",
+                    "step": "birth",
+                    "service_id": service_id,
+                    "data": {}
+                }
+            push_text(
+                line_user_id,
+                f"🎉 付款成功！{service_label}已開通！\n\n"
+                f"⭐ 老師將為您排出專屬紫微命盤 🔮\n\n"
+                f"請輸入您的出生日期：\n\n"
+                f"格式範例：\n1990-05-20\n1990/05/20\n1990年5月20日\n\n"
+                f"⚠️ 請使用西元國曆（陽曆）\n下一步將請您選擇出生時辰"
+            )
+
     except Exception as e:
         print(f"[_activate_single_service 錯誤] {e}")
 
@@ -620,8 +716,6 @@ def process_referral(new_user_id, ref_code):
             f"📊 目前推薦人數：{new_count} 人\n"
             f"💎 推薦滿 3 人或 5 人可獲得代幣獎勵 🌙"
         )
-
-
 # ══════════════════════════════════════════
 #  占卜核心（背景執行）
 # ══════════════════════════════════════════
@@ -704,7 +798,7 @@ def do_reading_async(line_user_id, user_msg, reading_type, is_deep, zodiac, user
 
 
 # ══════════════════════════════════════════
-#  ★ 一週運勢核心（背景執行）★
+#  一週運勢核心（背景執行）
 # ══════════════════════════════════════════
 
 def _run_weekly_fortune_background(line_user_id, reading_type, zodiac, user):
@@ -909,11 +1003,10 @@ def _run_fortune_stick_background(line_user_id, category, question, stick):
 
 
 # ══════════════════════════════════════════
-#  ★ 人生迷航決策指南 AI 核心 ★
+#  人生迷航決策指南 AI 核心
 # ══════════════════════════════════════════
 
 def _run_love_reading_background(line_user_id, situation, question_num, service_id):
-    """復合分析（塔羅）- 每題抽一張牌"""
     try:
         card = random.choice(TAROT_CARDS)
         orientation = "逆位" if random.choice([True, False]) else "正位"
@@ -937,7 +1030,6 @@ def _run_love_reading_background(line_user_id, situation, question_num, service_
         )
         response_text = chat_completion.choices[0].message.content
 
-        # 計算剩餘次數
         limit = FOLLOW_UP_LIMITS.get("love_reading", 5)
         remaining = limit - question_num
 
@@ -966,7 +1058,6 @@ def _run_love_reading_background(line_user_id, situation, question_num, service_
                 f"🌟 本次復合分析已完成，感謝您的信任\n"
                 f"若有新的困惑，可重新購買服務 💎"
             )
-            # 標記服務完成
             if service_id:
                 supabase.table("services").update({
                     "status": "completed"
@@ -980,7 +1071,6 @@ def _run_love_reading_background(line_user_id, situation, question_num, service_
 
 
 def _run_career_background(line_user_id, data, service_id):
-    """職場運勢（八字）"""
     try:
         birth = data.get("birth", "未知")
         question = data.get("question", "")
@@ -1050,7 +1140,6 @@ def _run_career_background(line_user_id, data, service_id):
 
 
 def _run_wealth_background(line_user_id, data, service_id):
-    """財運分析（易經）"""
     try:
         birth = data.get("birth", "未知")
         question = data.get("question", "")
@@ -1164,7 +1253,6 @@ def _run_double_chart_background(line_user_id, data, service_id):
         except Exception as e:
             print(f"tarot_logs 寫入錯誤: {e}")
 
-        # 追問提示
         limit = FOLLOW_UP_LIMITS.get("double_chart", 1)
         follow_up_hint = (
             f"\n\n━━━━━━━━━━━━━━━\n"
@@ -1294,7 +1382,6 @@ def _run_ziwei_background(line_user_id, data, service_id):
 # ══════════════════════════════════════════
 
 def _run_follow_up_background(line_user_id, service_type, question, service_id, follow_up_num):
-    """天書服務追問處理"""
     try:
         service_labels = {
             "double_chart": "💑 雙人合盤",
@@ -1318,7 +1405,6 @@ def _run_follow_up_background(line_user_id, service_type, question, service_id, 
         )
         response_text = chat_completion.choices[0].message.content
 
-        # 更新追問次數
         new_count = increment_follow_up(service_id)
         limit = FOLLOW_UP_LIMITS.get(service_type, 0)
         remaining = limit - new_count
@@ -1379,7 +1465,6 @@ def do_daily_push():
         birth_date = user.get("birth_date")
         zodiac = get_zodiac(birth_date) if birth_date else None
 
-        # ★ 生日當天特別訊息 ★
         is_birthday = False
         if birth_date:
             try:
@@ -1409,7 +1494,6 @@ def do_daily_push():
                 )
                 birthday_reading = chat_completion.choices[0].message.content
                 crystal_footer = get_lucky_item_text()
-
                 birthday_text = (
                     f"🎂 生日快樂！\n\n"
                     f"親愛的，今天是您的特別日子 🌟\n"
@@ -1418,11 +1502,10 @@ def do_daily_push():
                     f"{birthday_reading}{crystal_footer}"
                 )
                 push_text(line_user_id, birthday_text)
-                continue  # 生日當天只推生日訊息，不推一般運勢
+                continue
             except Exception as e:
                 print(f"[生日推播失敗] {line_user_id}：{e}")
 
-        # 一般每日推播
         card = random.choice(TAROT_CARDS)
         orientation = "逆位" if random.choice([True, False]) else "正位"
         zodiac_hint = f"使用者的星座是【{zodiac}】，請融入星座特質。\n" if zodiac else ""
@@ -1445,6 +1528,8 @@ def do_daily_push():
                 )
         except Exception as e:
             print(f"[排程] 推播失敗 {line_user_id}：{e}")
+
+
 # ══════════════════════════════════════════
 #  Flex Message 工廠
 # ══════════════════════════════════════════
@@ -1501,7 +1586,6 @@ def build_confirm_token_flex(action_type, tokens_required, current_tokens):
 
 
 def build_confirm_service_flex(service_type, price, tokens_required, current_tokens, title, desc):
-    """人生迷航決策指南服務確認 Flex"""
     flex_content = {
         "type": "bubble",
         "styles": {"header": {"backgroundColor": "#2D1B69"}, "body": {"backgroundColor": "#F8F4FF"}},
@@ -1684,7 +1768,6 @@ def build_divination_service_flex():
     return FlexMessage(alt_text="占卜服務", contents=FlexContainer.from_dict(flex_content))
 
 
-# ★ 新增：人生迷航決策指南 Flex ★
 def build_life_navigation_flex():
     flex_content = {
         "type": "bubble",
@@ -2304,11 +2387,9 @@ def handle_message(event):
     zodiac = get_zodiac(user.get("birth_date")) if user.get("birth_date") else None
 
     # ══════════════════════════════════════
-    #  ★ 管理員指令 ★
+    #  管理員指令
     # ══════════════════════════════════════
     if line_user_id == ADMIN_USER_ID:
-
-        # 補代幣 [ID] [數量]
         if user_msg.startswith("補代幣 "):
             parts = user_msg.split()
             if len(parts) == 3:
@@ -2335,7 +2416,6 @@ def handle_message(event):
                     ))
             return
 
-        # 查用戶 [ID]
         if user_msg.startswith("查用戶 "):
             parts = user_msg.split()
             if len(parts) == 2:
@@ -2372,7 +2452,6 @@ def handle_message(event):
         mode = state.get("mode")
         step = state.get("step")
 
-        # ── 靈性占卜 ──
         if mode == "spiritual":
             data = state.get("data", {})
             if step == "q1":
@@ -2422,7 +2501,6 @@ def handle_message(event):
                 t.start()
                 return
 
-        # ── 急救占卜 ──
         elif mode == "deep" and step == "question":
             reading_type = state.get("type", "tarot")
             pending_state.pop(line_user_id, None)
@@ -2435,7 +2513,6 @@ def handle_message(event):
             do_reading_async(line_user_id, user_msg, reading_type, True, zodiac, user)
             return
 
-        # ── 今日運勢 ──
         elif mode == "daily" and step == "question":
             reading_type = state.get("type", "tarot")
             can_read, quota_msg = check_free_reading_quota(line_user_id, user)
@@ -2479,7 +2556,6 @@ def handle_message(event):
             do_reading_async(line_user_id, user_msg, reading_type, False, zodiac, user)
             return
 
-        # ── 雙人合盤 ──
         elif mode == "double_chart":
             data = state.get("data", {})
             if step == "birth1":
@@ -2573,7 +2649,6 @@ def handle_message(event):
                         ))
                 return
 
-        # ── 流年運勢 ──
         elif mode == "year_fortune":
             data = state.get("data", {})
             if step == "birth":
@@ -2624,7 +2699,6 @@ def handle_message(event):
                         ))
                 return
 
-        # ── 紫微斗數 ──
         elif mode == "ziwei":
             data = state.get("data", {})
             if step == "birth":
@@ -2671,7 +2745,6 @@ def handle_message(event):
                         ))
                 return
 
-        # ── 復合分析 ──
         elif mode == "love_reading":
             if step == "question":
                 service_id = state.get("service_id")
@@ -2683,7 +2756,6 @@ def handle_message(event):
                         reply_token=event.reply_token,
                         messages=[TextMessage(text=wait_msg)]
                     ))
-                # 更新追問次數
                 if service_id and question_num > 1:
                     increment_follow_up(service_id)
                 t = threading.Thread(
@@ -2692,7 +2764,6 @@ def handle_message(event):
                     daemon=True
                 )
                 t.start()
-                # 若還有追問次數，重新設定等待下一題狀態
                 limit = FOLLOW_UP_LIMITS.get("love_reading", 5)
                 if question_num < limit:
                     pending_state[line_user_id] = {
@@ -2703,7 +2774,6 @@ def handle_message(event):
                     }
                 return
 
-        # ── 職場運勢 ──
         elif mode == "career":
             data = state.get("data", {})
             if step == "birth":
@@ -2778,7 +2848,6 @@ def handle_message(event):
                 t.start()
                 return
 
-        # ── 財運分析 ──
         elif mode == "wealth":
             data = state.get("data", {})
             if step == "birth":
@@ -2873,7 +2942,6 @@ def handle_message(event):
             ))
         return
 
-    # ★ 人生迷航決策指南 ★
     elif user_msg in ["人生迷航決策指南"]:
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
@@ -2997,8 +3065,7 @@ def handle_message(event):
         except Exception as e:
             print(f"[財運分析建立訂單錯誤] {e}")
             reply_text = "✨ 付款連結建立失敗，請稍後再試 🙏"
-        with ApiClient(configuration) as api
-_client:
+        with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
                 reply_token=event.reply_token,
                 messages=[TextMessage(text=reply_text)]
@@ -3465,7 +3532,6 @@ _client:
         return
 
     elif user_msg in ["星運VIP", "VIP", "vip", "升級VIP", "星運 VIP"]:
-        ref_code = user.get("referral_code") or ""
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
                 reply_token=event.reply_token,
@@ -3474,6 +3540,22 @@ _client:
         return
 
     else:
+        # ★ 人生迷航決策指南子服務關鍵字保護 ★
+        navigation_keywords = [
+            "復合分析", "職場運勢", "財運分析",
+            "購買復合分析", "購買職場運勢", "購買財運分析",
+            "人生迷航決策指南", "占卜服務", "專屬天書",
+            "雙人合盤", "流年運勢", "紫微斗數",
+            "購買雙人合盤", "購買流年運勢", "購買紫微斗數",
+        ]
+        if user_msg in navigation_keywords:
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[build_life_navigation_flex()]
+                ))
+            return
+
         # 一般訊息 → 免費塔羅占卜
         can_read, quota_msg = check_free_reading_quota(line_user_id, user)
         if not can_read:
@@ -3751,8 +3833,7 @@ def handle_postback(event):
 
 # ══════════════════════════════════════════
 #  啟動
-# ══════════════════════════════════════════
-
+# ══════════════════════
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
