@@ -104,6 +104,31 @@ WAITING_MSGS_SPIRITUAL = [
     "💫 靈魂之書正在為您翻開...\n\n老師正在解讀您的靈性課題，請稍候約 3 分鐘 🕯️",
 ]
 
+# ══ 求籤問卜常數 ══
+FORTUNE_STICK_CATEGORIES = {
+    "愛情":   ["感情現況如何？", "對方對我有意思嗎？", "這段感情值得繼續嗎？", "何時能遇到對的人？", "分手後還有復合機會嗎？"],
+    "事業學業": ["工作轉換時機到了嗎？", "升遷機會近了嗎？", "創業適合現在嗎？", "考試能順利通過嗎？", "目前的努力方向正確嗎？"],
+    "財運":   ["近期偏財運如何？", "投資時機成熟了嗎？", "借出去的錢能要回來嗎？", "加薪機會近了嗎？", "財務困境何時能解？"],
+    "健康":   ["身體近期需要注意什麼？", "長期的困擾何時能改善？", "心理狀態需要調整嗎？", "家人的健康狀況如何？", "目前的養生方式正確嗎？"],
+    "生活":   ["搬家或換環境的時機到了嗎？", "家庭關係如何改善？", "近期出行平安嗎？", "這個重要決定該如何選擇？", "貴人何時出現？"],
+}
+
+FORTUNE_STICK_POEMS = [
+    {"num": 1,  "grade": "上上籤", "poem": "春風得意馬蹄疾，一日看盡長安花，時機已至莫猶豫，萬事俱備東風來"},
+    {"num": 8,  "grade": "上吉籤", "poem": "雲開霧散見青天，撥雲見日喜心田，貴人相助逢吉時，前程似錦步步高"},
+    {"num": 15, "grade": "中吉籤", "poem": "靜待花開自有時，莫急莫躁守本心，水到渠成天自助，耐心等候好時機"},
+    {"num": 22, "grade": "中平籤", "poem": "半晴半雨過雲天，得失之間需謹慎，守住本分莫貪進，平穩度日自安然"},
+    {"num": 30, "grade": "平籤",   "poem": "山重水複疑無路，柳暗花明又一村，困境之中藏轉機，靜心思量自有解"},
+    {"num": 38, "grade": "中吉籤", "poem": "月圓之後有月缺，事緩則圓勿操急，積累能量待時發，厚積薄發終成事"},
+    {"num": 45, "grade": "上吉籤", "poem": "金風玉露一相逢，便勝卻人間無數，緣分天定莫強求，順其自然得圓滿"},
+    {"num": 52, "grade": "中平籤", "poem": "欲速則不達其功，穩紮穩打方為上，步步為營守正道，終有一日見光明"},
+    {"num": 60, "grade": "小吉籤", "poem": "潮起潮落皆有時，人生起伏是常事，保持初心不忘本，終將迎來好時節"},
+    {"num": 68, "grade": "中吉籤", "poem": "蟄伏之龍待時飛，厚積薄發自有期，莫因眼前小困頓，放棄心中大志向"},
+    {"num": 75, "grade": "上上籤", "poem": "龍騰四海志凌雲，天時地利人和聚，把握當下勇向前，輝煌就在不遠處"},
+    {"num": 88, "grade": "中吉籤", "poem": "花開花落自有時，緣來緣去莫強留，順應天命守本心，自然而然得圓滿"},
+    {"num": 99, "grade": "上吉籤", "poem": "九九歸一萬事成，天道酬勤終有報，堅持信念不動搖，美好未來在前方"},
+]
+
 SHICHEN_LIST = [
     "子時（23:00–01:00）", "丑時（01:00–03:00）",
     "寅時（03:00–05:00）", "卯時（05:00–07:00）",
@@ -243,8 +268,7 @@ def check_free_reading_quota(line_user_id, user):
             "老師還想繼續為您指引：\n"
             "💎 消耗 1 顆代幣，繼續今日占卜\n"
             "🌌 靈性占卜 / 急救占卜 消耗 2 顆代幣\n\n"
-            "輸入「購買代幣」補充代幣 🌙\n"
-            "輸入「星運VIP」查看訂閱方案"
+            "輸入「購買代幣」補充代幣 🌙"
         )
         return False, msg
     return True, None
@@ -365,54 +389,30 @@ def _activate_subscription(order_id, payment):
             "confirmed_at": now.isoformat()
         }).eq("order_id", order_id).execute()
 
-        if package_type == "monthly":
-            expires_at = now + datetime.timedelta(days=30)
-            supabase.table("users").update({
-                "subscription_type": "monthly",
-                "plan": "vip",
-                "tokens": 15,
-                "free_readings_used": 0,
-                "subscription_expires_at": expires_at.date().isoformat(),
-                "subscription_reset_date": now.date().isoformat()
-            }).eq("line_user_id", line_user_id).execute()
+        tokens_to_add = payment.get("tokens_to_add") or 0
+        if tokens_to_add > 0:
+            user = get_or_create_user(line_user_id)
+            new_tokens = (user.get("tokens") or 0) + tokens_to_add
+            supabase.table("users").update({"tokens": new_tokens}).eq("line_user_id", line_user_id).execute()
             supabase.table("token_logs").insert({
                 "line_user_id": line_user_id,
-                "change": 15,
-                "reason": "月訂閱付款成功"
+                "change": tokens_to_add,
+                "reason": f"{package_type}付款成功"
             }).execute()
+            pkg_names = {
+                "星塵入門包": "✨ 星塵入門包",
+                "月光超值包": "🌙 月光超值包",
+                "星河豪華包": "🌌 星河豪華包"
+            }
+            pkg_label = pkg_names.get(package_type, package_type)
             push_text(
                 line_user_id,
-                "🎉 付款成功！歡迎加入星運 VIP！\n\n"
-                "👑 月訂閱・星運令 已啟用\n"
-                "💎 本月靈性占卜額度：15 次\n"
-                f"📅 訂閱到期日：{expires_at.date()}\n\n"
-                "老師已準備好，隨時為您指引星途 🔮"
+                f"🎉 付款成功！代幣已入帳！\n\n"
+                f"📦 方案：{pkg_label}\n"
+                f"💎 新增代幣：{tokens_to_add} 顆\n"
+                f"💰 目前代幣餘額：{new_tokens} 顆\n\n"
+                f"老師已準備好，隨時為您進行占卜 🔮"
             )
-        else:
-            tokens_to_add = payment.get("tokens_to_add") or 0
-            if tokens_to_add > 0:
-                user = get_or_create_user(line_user_id)
-                new_tokens = (user.get("tokens") or 0) + tokens_to_add
-                supabase.table("users").update({"tokens": new_tokens}).eq("line_user_id", line_user_id).execute()
-                supabase.table("token_logs").insert({
-                    "line_user_id": line_user_id,
-                    "change": tokens_to_add,
-                    "reason": f"{package_type}付款成功"
-                }).execute()
-                pkg_names = {
-                    "星塵入門包": "✨ 星塵入門包",
-                    "月光超值包": "🌙 月光超值包",
-                    "星河豪華包": "🌌 星河豪華包"
-                }
-                pkg_label = pkg_names.get(package_type, package_type)
-                push_text(
-                    line_user_id,
-                    f"🎉 付款成功！代幣已入帳！\n\n"
-                    f"📦 方案：{pkg_label}\n"
-                    f"💎 新增代幣：{tokens_to_add} 顆\n"
-                    f"💰 目前代幣餘額：{new_tokens} 顆\n\n"
-                    f"老師已準備好，隨時為您進行占卜 🔮"
-                )
     except Exception as e:
         print(f"[_activate_subscription 錯誤] {e}")
 
@@ -452,59 +452,6 @@ def _activate_single_service(order_id, order):
         )
     except Exception as e:
         print(f"[_activate_single_service 錯誤] {e}")
-
-
-# ══════════════════════════════════════════
-#  月訂閱重置（每月1號）
-# ══════════════════════════════════════════
-
-def reset_monthly_subscription():
-    tz = pytz.timezone("Asia/Taipei")
-    today = datetime.datetime.now(tz).date()
-    if today.day != 1:
-        return
-    print(f"[月訂閱重置] 開始執行：{today}")
-    try:
-        users = supabase.table("users") \
-            .select("line_user_id, tokens, subscription_reset_date, subscription_expires_at") \
-            .eq("subscription_type", "monthly") \
-            .execute().data or []
-    except Exception as e:
-        print(f"[月訂閱重置] 取得用戶失敗：{e}")
-        return
-    for user in users:
-        uid = user["line_user_id"]
-        expires_at = user.get("subscription_expires_at")
-        if expires_at and str(expires_at) < str(today):
-            supabase.table("users").update({
-                "subscription_type": "free",
-                "plan": "free"
-            }).eq("line_user_id", uid).execute()
-            push_text(uid,
-                "🌙 您的月訂閱已到期，已自動切換回免費方案。\n\n"
-                "輸入「星運VIP」可重新訂閱 ✨"
-            )
-            continue
-        last_reset = user.get("subscription_reset_date")
-        if last_reset and str(last_reset)[:7] == str(today)[:7]:
-            continue
-        supabase.table("users").update({
-            "tokens": 15,
-            "free_readings_used": 0,
-            "subscription_reset_date": str(today)
-        }).eq("line_user_id", uid).execute()
-        supabase.table("token_logs").insert({
-            "line_user_id": uid,
-            "change": 15,
-            "reason": "月訂閱每月重置"
-        }).execute()
-        push_text(uid,
-            f"🎉 您的月訂閱已於 {today} 自動重置！\n\n"
-            "💎 本月靈性占卜額度：15 次\n"
-            "✨ 免費占卜次數已歸零重新計算\n\n"
-            "老師已準備好，隨時為您指引星途 🔮"
-        )
-    print(f"[月訂閱重置] 執行完畢：{today}")
 
 
 # ══════════════════════════════════════════
@@ -727,15 +674,71 @@ def _run_spiritual_background(line_user_id, data, zodiac):
         footer = get_lucky_item_text()
         push_text(
             line_user_id,
-            f"🌌 靈性占卜解讀\n\n{response_text}{footer}\n\n"
-            f"━━━━━━━━━━━━━━━\n"
-            f"💬 若有追問，請直接傳訊息給老師\n"
-            f"（靈性占卜提供 2 次免費追問）"
+            f"🌌 靈性占卜解讀\n\n{response_text}{footer}"
         )
 
     except Exception as e:
         print(f"[靈性占卜背景錯誤] {line_user_id}: {e}")
         push_text(line_user_id, "✨ 星辰訊號有些微干擾，請再傳一次訊息給老師 🙏")
+
+
+# ══════════════════════════════════════════
+#  求籤問卜核心（背景執行）
+# ══════════════════════════════════════════
+
+def _run_fortune_stick_background(line_user_id, category, question, stick):
+    try:
+        # 靜默等待 12~15 秒，模擬真實求籤體驗
+        time.sleep(random.uniform(12, 15))
+
+        user_prompt = f"""請進行求籤解析：
+問卜類別：{category}
+問題：{question}
+籤號：第 {stick['num']} 籤 — {stick['grade']}
+籤詩：{stick['poem']}
+
+請以溫柔神秘的命理師角度，給出約200字的解籤內容，包含：
+- 針對「{question}」這個問題的具體解讀
+- 籤詩的意涵說明
+- 實際行動建議 1~2 點
+- 一句溫柔的鼓勵結語
+
+語氣溫柔有詩意，像廟裡智慧的老師在為信徒解籤。"""
+
+        chat_completion = groq_client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt}
+            ],
+            model="llama-3.3-70b-versatile",
+        )
+        response_text = chat_completion.choices[0].message.content
+
+        try:
+            supabase.table("tarot_logs").insert({
+                "line_user_id": line_user_id,
+                "card_name": f"第{stick['num']}籤",
+                "reading": response_text,
+                "category": f"求籤問卜｜{category}",
+                "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
+            }).execute()
+        except Exception as e:
+            print(f"[求籤 tarot_logs 寫入錯誤] {e}")
+
+        poem_lines = stick['poem'].replace('，', '\n')
+        result_text = (
+            f"🎊 第 {stick['num']} 籤 — {stick['grade']}\n\n"
+            f"📜 籤詩：\n{poem_lines}\n\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"🔮 解籤｜{category}\n"
+            f"問：{question}\n\n"
+            f"{response_text}"
+        )
+        push_text(line_user_id, result_text)
+
+    except Exception as e:
+        print(f"[求籤背景錯誤] {line_user_id}: {e}")
+        push_text(line_user_id, "✨ 星辰訊號有些微干擾，請再試一次 🙏")
 
 
 # ══════════════════════════════════════════
@@ -988,8 +991,7 @@ def build_confirm_token_flex(action_type, tokens_required, current_tokens):
 def build_shichen_flex():
     rows = []
     shichen_pairs = [
-        ("子時", "丑時"), ("寅時", "卯時"),
-        ("辰時", "巳時"), ("午時", "未時"),
+        ("子時", "丑時"), ("寅時", "卯時"), ("辰時", "巳時"), ("午時", "未時"),
         ("申時", "酉時"), ("戌時", "亥時"),
     ]
     shichen_full = {
@@ -1063,7 +1065,6 @@ def build_type_select_flex(mode="daily"):
     return FlexMessage(alt_text="請選擇占卜方式", contents=FlexContainer.from_dict(flex_content))
 
 
-# ✅ 新增：占卜服務選單（靈性占卜 + 急救占卜）
 def build_divination_service_flex():
     flex_content = {
         "type": "bubble",
@@ -1083,6 +1084,9 @@ def build_divination_service_flex():
                 {"type": "separator"},
                 {"type": "text", "text": "🆘 急救占卜　2 顆代幣", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
                 {"type": "text", "text": "感情、工作、人生卡關？讓星盤深度為你指引方向", "color": "#888888", "size": "xs", "wrap": True},
+                {"type": "separator"},
+                {"type": "text", "text": "🎋 求籤問卜　1 顆代幣", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
+                {"type": "text", "text": "五大類別誠心問卜，AI 解籤為您指引方向", "color": "#888888", "size": "xs", "wrap": True},
             ]
         },
         "footer": {
@@ -1091,11 +1095,111 @@ def build_divination_service_flex():
                 {"type": "button", "style": "primary", "color": "#6B4FA0",
                  "action": {"type": "message", "label": "🌌 靈性占卜", "text": "靈性占卜"}},
                 {"type": "button", "style": "primary", "color": "#2D1B69",
-                 "action": {"type": "message", "label": "🆘 急救占卜", "text": "急救占卜"}}
+                 "action": {"type": "message", "label": "🆘 急救占卜", "text": "急救占卜"}},
+                {"type": "button", "style": "primary", "color": "#4A3080",
+                 "action": {"type": "message", "label": "🎋 求籤問卜", "text": "求籤問卜"}}
             ]
         }
     }
     return FlexMessage(alt_text="占卜服務", contents=FlexContainer.from_dict(flex_content))
+
+
+def build_fortune_stick_category_flex():
+    buttons = []
+    category_icons = {
+        "愛情": "💕", "事業學業": "💼", "財運": "💰", "健康": "🌿", "生活": "🏠"
+    }
+    for cat, icon in category_icons.items():
+        buttons.append({
+            "type": "button", "style": "secondary", "height": "sm",
+            "action": {"type": "postback", "label": f"{icon} {cat}", "data": f"fortune_cat_{cat}"}
+        })
+    flex_content = {
+        "type": "bubble",
+        "styles": {"header": {"backgroundColor": "#2D1B69"}, "body": {"backgroundColor": "#F8F4FF"}},
+        "header": {
+            "type": "box", "layout": "vertical",
+            "contents": [
+                {"type": "text", "text": "🎋 求籤問卜", "color": "#FFFFFF", "weight": "bold", "size": "lg"},
+                {"type": "text", "text": "誠心一問，神明為您指引方向 🙏", "color": "#C9B8FF", "size": "xs", "wrap": True}
+            ]
+        },
+        "body": {
+            "type": "box", "layout": "vertical", "spacing": "sm",
+            "contents": [
+                {"type": "text", "text": "請選擇問卜類別：", "color": "#555555", "size": "sm"},
+                {"type": "separator"}
+            ] + buttons
+        },
+        "footer": {
+            "type": "box", "layout": "vertical",
+            "contents": [
+                {"type": "text", "text": "💎 每次消耗 1 顆代幣", "color": "#AAAAAA", "size": "xs", "align": "center"}
+            ]
+        }
+    }
+    return FlexMessage(alt_text="求籤問卜 - 選擇類別", contents=FlexContainer.from_dict(flex_content))
+
+
+def build_fortune_stick_question_flex(category):
+    questions = FORTUNE_STICK_CATEGORIES.get(category, [])
+    buttons = []
+    for i, q in enumerate(questions):
+        buttons.append({
+            "type": "button", "style": "secondary", "height": "sm",
+            "action": {"type": "postback", "label": q, "data": f"fortune_q_{category}_{i}"}
+        })
+    flex_content = {
+        "type": "bubble",
+        "styles": {"header": {"backgroundColor": "#2D1B69"}, "body": {"backgroundColor": "#F8F4FF"}},
+        "header": {
+            "type": "box", "layout": "vertical",
+            "contents": [
+                {"type": "text", "text": f"🎋 {category}・求籤", "color": "#FFFFFF", "weight": "bold", "size": "lg"},
+                {"type": "text", "text": "請選擇您想問的問題 🙏", "color": "#C9B8FF", "size": "xs"}
+            ]
+        },
+        "body": {
+            "type": "box", "layout": "vertical", "spacing": "sm",
+            "contents": buttons
+        }
+    }
+    return FlexMessage(alt_text=f"{category}求籤 - 選擇問題", contents=FlexContainer.from_dict(flex_content))
+
+
+def build_fortune_stick_shake_flex(category, question):
+    flex_content = {
+        "type": "bubble",
+        "styles": {"header": {"backgroundColor": "#1A0A3D"}, "body": {"backgroundColor": "#F0EBF8"}},
+        "header": {
+            "type": "box", "layout": "vertical",
+            "contents": [
+                {"type": "text", "text": "🎋 籤筒已備妥", "color": "#FFD700", "weight": "bold", "size": "lg"},
+                {"type": "text", "text": "請誠心默念後搖動籤筒 🙏", "color": "#C9B8FF", "size": "xs"}
+            ]
+        },
+        "body": {
+            "type": "box", "layout": "vertical", "spacing": "md",
+            "contents": [
+                {"type": "text", "text": "📿 祈求文", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
+                {"type": "text",
+                 "text": f"「信徒今因\n【{question}】\n前來問卜，欲知吉凶禍福，\n請賜籤指點迷津 🙏」",
+                 "wrap": True, "color": "#444444", "size": "sm"},
+                {"type": "separator"},
+                {"type": "text", "text": "默念完畢，點下方按鈕搖籤 👇", "color": "#888888", "size": "xs", "align": "center"}
+            ]
+        },
+        "footer": {
+            "type": "box", "layout": "vertical",
+            "contents": [
+                {"type": "button", "style": "primary", "color": "#4A2080",
+                 "action": {"type": "postback",
+                            "label": "🎋 搖動籤筒！",
+                            "data": f"fortune_shake_{category}_{question}"}}
+            ]
+        }
+    }
+    return FlexMessage(alt_text="搖動籤筒", contents=FlexContainer.from_dict(flex_content))
 
 
 def build_token_flex(tokens, used, subscription_type="free"):
@@ -1129,7 +1233,7 @@ def build_token_flex(tokens, used, subscription_type="free"):
                 ]},
                 {"type": "separator"},
                 {"type": "text", "text": "代幣用途：", "color": "#888888", "size": "xs", "weight": "bold"},
-                {"type": "text", "text": "🌙 今日運勢（額度用完）1 顆｜🌌 靈性占卜 2 顆｜🆘 急救占卜 2 顆", "color": "#AAAAAA", "size": "xs", "wrap": True},
+                {"type": "text", "text": "🌙 今日運勢（額度用完）1 顆｜🌌 靈性占卜 2 顆｜🆘 急救占卜 2 顆｜🎋 求籤問卜 1 顆", "color": "#AAAAAA", "size": "xs", "wrap": True},
                 {"type": "separator"},
                 {"type": "text", "text": "代幣獲取方式：", "color": "#888888", "size": "xs", "weight": "bold"},
                 {"type": "text", "text": "每月自動補充 1 顆 🌙", "color": "#AAAAAA", "size": "xs"},
@@ -1176,7 +1280,7 @@ def build_token_shop_flex():
                 {"type": "text", "text": "深度陪伴，讓老師全年守護你的每個轉折", "color": "#888888", "size": "xs", "wrap": True},
                 {"type": "separator"},
                 {"type": "text", "text": "💡 代幣用途", "color": "#888888", "size": "xs", "weight": "bold"},
-                {"type": "text", "text": "🌙 今日運勢（額度用完）1 顆｜🌌 靈性占卜 2 顆｜🆘 急救占卜 2 顆", "color": "#AAAAAA", "size": "xs", "wrap": True},
+                {"type": "text", "text": "🌙 今日運勢（額度用完）1 顆｜🌌 靈性占卜 2 顆｜🆘 急救占卜 2 顆｜🎋 求籤問卜 1 顆", "color": "#AAAAAA", "size": "xs", "wrap": True},
             ]
         },
         "footer": {
@@ -1437,12 +1541,6 @@ def push_now():
     return "推播已觸發", 200
 
 
-@app.route("/reset-subscriptions", methods=["GET"])
-def trigger_reset():
-    reset_monthly_subscription()
-    return "月訂閱重置已觸發", 200
-
-
 # ══════════════════════════════════════════
 #  綠界金流路由
 # ══════════════════════════════════════════
@@ -1455,7 +1553,7 @@ def ecpay_go(order_id):
             payment = result.data[0]
             if payment.get("status") == "confirmed":
                 return "<html><body style='font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;'><h2>✅ 此訂單已完成付款</h2><p>請返回 LINE 查看詳情 🌟</p></body></html>", 200
-            pkg_name = payment.get("package_type", "月訂閱")
+            pkg_name = payment.get("package_type", "代幣包")
             confirm_url = f"{RENDER_URL}/pay/confirm"
             html, _ = ecpay_create(
                 user_id=payment["user_id"], amount=payment["amount"],
@@ -1629,6 +1727,7 @@ def handle_message(event):
 
     zodiac = get_zodiac(user.get("birth_date")) if user.get("birth_date") else None
 
+    # ══ pending_state 狀態機 ══
     if line_user_id in pending_state:
         state = pending_state[line_user_id]
         mode = state.get("mode")
@@ -1835,12 +1934,33 @@ def handle_message(event):
             ))
         return
 
-    # ✅ 新增：占卜服務選單
     elif user_msg in ["占卜服務"]:
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
                 reply_token=event.reply_token,
                 messages=[build_divination_service_flex()]
+            ))
+        return
+
+    elif user_msg in ["求籤問卜", "求籤", "問卜"]:
+        fresh = supabase.table("users").select("tokens").eq("line_user_id", line_user_id).execute()
+        current_tokens = fresh.data[0].get("tokens", 0) if fresh.data else 0
+        if current_tokens < 1:
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=(
+                        "💎 代幣不足\n\n"
+                        f"求籤問卜需要 1 顆代幣\n"
+                        f"您目前只有 {current_tokens} 顆\n\n"
+                        "輸入「購買代幣」補充代幣 🌙"
+                    ))]
+                ))
+            return
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[build_fortune_stick_category_flex()]
             ))
         return
 
@@ -1998,7 +2118,7 @@ def handle_message(event):
                         "老師將為您解讀兩人的命格相容性 🔮\n\n"
                         "📅 請輸入甲方（您自己）的出生日期\n\n"
                         "格式範例：\n1990-05-20\n1990/05/20\n1990年5月20日\n\n"
-                        "⚠️ 請使用西元國曆（陽曆）\n不確定農曆轉國曆可先 Google 查詢"
+                        "⚠️ 請使用西元國曆（陽曆）"
                     ))]
                 ))
             return
@@ -2153,35 +2273,6 @@ def handle_message(event):
             ))
         return
 
-    elif user_msg in ["訂閱", "月訂閱", "訂閱月訂閱"]:
-        try:
-            order_id = str(uuid.uuid4()).replace("-", "")[:20]
-            supabase.table("payments").insert({
-                "user_id": line_user_id,
-                "order_id": order_id,
-                "amount": 300,
-                "currency": "TWD",
-                "package_type": "monthly",
-                "tokens_to_add": 0,
-                "status": "pending"
-            }).execute()
-            pay_url = f"{RENDER_URL}/pay/go/{order_id}"
-            reply_text = (
-                "👑 月訂閱・星運令　NT$300／月\n\n"
-                "✨ 訂閱權益：\n• 每月 15 次靈性占卜額度\n"
-                "• 每月1號自動重置\n• 🛍️ 飾品商店 9 折優惠\n\n"
-                f"請點以下連結完成付款：\n{pay_url}\n\n付款完成後老師會立即為您開通 🌟"
-            )
-        except Exception as e:
-            print(f"[月訂閱建立付款錯誤] {e}")
-            reply_text = "✨ 付款連結建立失敗，請稍後再試 🙏"
-        with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(ReplyMessageRequest(
-                reply_token=event.reply_token,
-                messages=[TextMessage(text=reply_text)]
-            ))
-        return
-
     elif user_msg in ["我的設定", "設定"]:
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
@@ -2300,14 +2391,16 @@ def handle_message(event):
     elif user_msg in ["說明", "使用說明", "help", "Help"]:
         reply_text = (
             "🔮 星運導航使用說明\n\n"
-            "🌙 今日運勢 → 塔羅／八字／易經每日解讀（每月 3 次免費，額度用完消耗 1 顆代幣）\n"
-            "🔮 占卜服務 → 靈性占卜／急救占卜（各 2 顆代幣）\n"
-            "📖 專屬天書 → 合盤／流年／紫微斗數\n"
-            "💎 我的代幣 → 查詢餘額與儲值\n"
-            "👑 星運VIP → 查看訂閱方案\n"
-            "⚙️ 我的設定 → 管理生辰資料\n"
-            "📅 簽到 → 每週全勤送代幣\n"
-            "📤 我的推薦碼 → 推薦好友送代幣\n"
+            "🌙 今日運勢 → 塔羅／八字／易經每日解讀\n"
+            "（每月 3 次免費，額度用完消耗 1 顆代幣）\n\n"
+            "🔮 占卜服務 → 靈性占卜／急救占卜（各 2 顆代幣）\n\n"
+            "🎋 求籤問卜 → 五大類別誠心問卜（1 顆代幣）\n\n"
+            "📖 專屬天書 → 合盤／流年／紫微斗數\n\n"
+            "💎 我的代幣 → 查詢餘額與儲值\n\n"
+            "👑 星運VIP → 查看方案\n\n"
+            "⚙️ 我的設定 → 管理生辰資料\n\n"
+            "📅 簽到 → 每週全勤送代幣\n\n"
+            "📤 我的推薦碼 → 推薦好友送代幣\n\n"
             "📖 我的紀錄 → 查看最近 5 次占卜\n\n"
             "💡 若老師沒有立即回應，\n"
             "請稍等約 30 秒後再傳訊息 ✨"
@@ -2438,6 +2531,55 @@ def handle_postback(event):
             ))
         return
 
+    # ══ 求籤問卜 Postback ══
+    if data.startswith("fortune_cat_"):
+        category = data.replace("fortune_cat_", "")
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[build_fortune_stick_question_flex(category)]
+            ))
+        return
+
+    if data.startswith("fortune_q_"):
+        payload = data.replace("fortune_q_", "")
+        parts = payload.split("_", 1)
+        category = parts[0]
+        q_index = int(parts[1])
+        question = FORTUNE_STICK_CATEGORIES[category][q_index]
+        if not use_tokens(line_user_id, 1, f"求籤問卜｜{category}"):
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text="💎 代幣不足，無法求籤\n輸入「購買代幣」補充代幣 🌙")]
+                ))
+            return
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[build_fortune_stick_shake_flex(category, question)]
+            ))
+        return
+
+    if data.startswith("fortune_shake_"):
+        payload = data.replace("fortune_shake_", "")
+        parts = payload.split("_", 1)
+        category = parts[0]
+        question = parts[1] if len(parts) > 1 else ""
+        stick = random.choice(FORTUNE_STICK_POEMS)
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[TextMessage(text="🎋 籤筒搖動中......\n\n請保持誠心，靜待神明指示 🙏")]
+            ))
+        t = threading.Thread(
+            target=_run_fortune_stick_background,
+            args=(line_user_id, category, question, stick),
+            daemon=True
+        )
+        t.start()
+        return
+
     if data.startswith("shichen_"):
         shichen_value = data.replace("shichen_", "")
         if line_user_id in pending_state and pending_state[line_user_id].get("mode") == "ziwei":
@@ -2508,4 +2650,5 @@ def handle_postback(event):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
 
