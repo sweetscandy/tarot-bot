@@ -4013,7 +4013,7 @@ def handle_message(event):
                 follow_up_num = state.get("follow_up_num", 1)
                 data["question"] = user_msg
                 data["follow_up_num"] = follow_up_num
-limit = FOLLOW_UP_LIMITS.get("career", 2)
+                limit = FOLLOW_UP_LIMITS.get("career", 2)
                 pending_state.pop(line_user_id, None)
                 wait_msg = random.choice(WAITING_MSGS_CAREER)
                 with ApiClient(configuration) as api_client:
