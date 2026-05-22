@@ -6,3 +6,4 @@ gunicorn
 pytz
 httpx
 requests
+APScheduler==3.10.4
