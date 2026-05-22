@@ -15,6 +15,7 @@ from supabase import create_client
 from ecpay import create_payment as ecpay_create, verify_notify, is_payment_success
 import os, random, datetime, pytz, threading, uuid, time
 import requests
+from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
 
@@ -166,6 +167,8 @@ FORTUNE_STICK_POEMS = [
     {"num": 88, "grade": "中吉籤", "poem": "花開花落自有時，緣來緣去莫強留，順應天命守本心，自然而然得圓滿"},
     {"num": 99, "grade": "上吉籤", "poem": "九九歸一萬事成，天道酬勤終有報，堅持信念不動搖，美好未來在前方"},
 ]
+FORTUNE_STICKS = FORTUNE_STICK_POEMS
+
 
 SHICHEN_LIST = [
     "子時（23:00–01:00）", "丑時（01:00–03:00）",
@@ -3132,6 +3135,25 @@ def handle_message(event):
                 t = threading.Thread(
                     target=_run_career_background,
                     args=(line_user_id, data.copy(), service_id),
+                    daemon=True
+                )
+                t.start()
+                return
+        elif mode == "follow_up":
+            if step == "question":
+                service_type = state.get("service_type")
+                service_id   = state.get("service_id")
+                follow_up_num = state.get("follow_up_num", 1)
+                pending_state.pop(line_user_id, None)
+                wait_msg = random.choice(WAITING_MSGS_TIANBOOK)
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text=wait_msg)]
+                    ))
+                t = threading.Thread(
+                    target=_run_follow_up_background,
+                    args=(line_user_id, service_type, user_msg, service_id, follow_up_num),
                     daemon=True
                 )
                 t.start()
