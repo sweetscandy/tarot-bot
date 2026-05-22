@@ -2402,7 +2402,7 @@ def pay_cancel():
 
 
 @app.route("/webhook", methods=["POST"])
-def webhook():
+def callback():
     signature = request.headers.get("X-Line-Signature", "")
     body = request.get_data(as_text=True)
     try:
