@@ -1853,7 +1853,7 @@ def build_divination_service_flex():
                 {"type": "text", "text": "感情、工作、人生卡關？讓星盤深度為你指引方向", "color": "#888888", "size": "xs", "wrap": True},
                 {"type": "separator"},
                 {"type": "text", "text": "🎋 求籤問卜　1 顆代幣", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
-                {"type": "text", "text": "五大類別誠心問卜，AI 解籤為您指引方向", "color": "#888888", "size": "xs", "wrap": True},
+                {"type": "text", "text": "五大類別誠心問卜，老師 解籤為您指引方向", "color": "#888888", "size": "xs", "wrap": True},
             ]
         },
         "footer": {
