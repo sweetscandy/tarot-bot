@@ -4084,8 +4084,7 @@ def handle_postback(event):
             category = parts[0]
             try:
                 q_idx = int(parts[1])
-                questions = FORTUNE_STICK_CATEGORIES.get
-(category, [])
+                questions = FORTUNE_STICK_CATEGORIES.get(category, [])
                 question = questions[q_idx] if q_idx < len(questions) else "您的問題"
             except (ValueError, IndexError):
                 question = "您的問題"
