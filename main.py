@@ -2304,25 +2304,38 @@ def push_now():
 
 @app.route("/pay/go/<order_id>", methods=["GET"])
 def ecpay_go(order_id):
+    import time
     try:
+        # ── 先查 payments 表（代幣包訂單）──
         result = supabase.table("payments").select("*").eq("order_id", order_id).execute()
         if result.data:
             payment = result.data[0]
             if payment.get("status") == "confirmed":
                 return "<html><body style='font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;'><h2>✅ 此訂單已完成付款</h2><p>請返回 LINE 查看詳情 🌟</p></body></html>", 200
+
             pkg_name = payment.get("package_type", "代幣包")
             confirm_url = f"{RENDER_URL}/pay/confirm"
-            html, _ = ecpay_create(
-                user_id=payment["user_id"], amount=payment["amount"],
-                order_id=order_id, product_name=f"星運導航-{pkg_name}",
+            new_trade_no = order_id[:20] + str(int(time.time()))[-5:]
+
+            html, mer_trade_no = ecpay_create(
+                user_id=payment["user_id"],
+                amount=payment["amount"],
+                order_id=new_trade_no,
+                product_name=f"星運導航-{pkg_name}",
                 confirm_url=confirm_url
             )
+            supabase.table("payments").update({
+                "mer_trade_no": mer_trade_no
+            }).eq("order_id", order_id).execute()
             return html
+
+        # ── 再查 orders 表（占卜服務訂單）──
         result2 = supabase.table("orders").select("*").eq("order_id", order_id).execute()
         if result2.data:
             order = result2.data[0]
             if order.get("status") == "paid":
                 return "<html><body style='font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;'><h2>✅ 此訂單已完成付款</h2><p>請返回 LINE 查看詳情 🌟</p></body></html>", 200
+
             service_names = {
                 "double_chart": "雙人合盤解析",
                 "year_fortune": "流年運勢報告",
@@ -2333,16 +2346,27 @@ def ecpay_go(order_id):
             }
             pkg_name = service_names.get(order["product_type"], order["product_type"])
             confirm_url = f"{RENDER_URL}/pay/confirm"
-            html, _ = ecpay_create(
-                user_id=order["user_id"], amount=order["amount"],
-                order_id=order_id, product_name=f"星運導航-{pkg_name}",
+            new_trade_no = order_id[:20] + str(int(time.time()))[-5:]
+
+            html, mer_trade_no = ecpay_create(
+                user_id=order["user_id"],
+                amount=order["amount"],
+                order_id=new_trade_no,
+                product_name=f"星運導航-{pkg_name}",
                 confirm_url=confirm_url
             )
+            supabase.table("orders").update({
+                "mer_trade_no": mer_trade_no
+            }).eq("order_id", order_id).execute()
             return html
-        return "找不到訂單", 404
+
+        # ── 兩張表都找不到 ──
+        return "<html><body style='font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;'><h2>❌ 找不到訂單</h2><p>請返回 LINE 重新操作 🙏</p></body></html>", 404
+
     except Exception as e:
-        print(f"[ecpay_go 錯誤] {e}")
-        return "伺服器錯誤，請返回 LINE 重新操作", 500
+        print(f"[pay/go] 錯誤: {e}")
+        return "<html><body style='font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;'><h2>❌ 系統錯誤</h2><p>請返回 LINE 重新操作 🙏</p></body></html>", 500
+
 
 
 # ★ 修正：/pay/notify 使用正確欄位名 MerTradeNo
