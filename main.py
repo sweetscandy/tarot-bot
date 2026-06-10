@@ -2372,20 +2372,16 @@ def ecpay_notify():
 def ecpay_confirm():
     try:
         print(f"[pay/confirm] method={request.method}, form={request.form.to_dict()}, args={request.args.to_dict()}")
+
         if request.method == "POST":
             form_data = request.form.to_dict()
-            from payuni import get_notify_data, verify_notify as _verify
-            if _verify(form_data):
-                notify_data = get_notify_data(form_data)
-                status   = notify_data.get("Status", "")
-                order_id = notify_data.get("MerTradeNo", "")  # ★ 修正欄位名
-            else:
-                # 驗簽失敗時 fallback 直接讀原始欄位
-                status   = form_data.get("Status", "")
-                order_id = form_data.get("MerTradeNo", "")
+            from payuni import get_return_data
+            notify_data = get_return_data(form_data)
+            status   = notify_data.get("Status", "")
+            order_id = notify_data.get("MerTradeNo", "")
         else:
             status   = request.args.get("Status", "")
-            order_id = request.args.get("MerTradeNo", "")  # ★ 修正欄位名
+            order_id = request.args.get("MerTradeNo", "")
 
         print(f"[pay/confirm] status={status}, order_id={order_id}")
 
@@ -2412,6 +2408,7 @@ def ecpay_confirm():
     except Exception as e:
         print(f"[ecpay_confirm 錯誤] {e}")
         return "伺服器錯誤", 500
+
 
 
 @app.route("/pay/cancel", methods=["GET"])
