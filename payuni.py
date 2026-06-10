@@ -26,26 +26,19 @@ def _aes_encrypt(data: dict) -> str:
     iv     = PAYUNI_HASH_IV.encode("utf-8")
     cipher = AES.new(key, AES.MODE_CBC, iv)
     encrypted = cipher.encrypt(pad(plain.encode("utf-8"), AES.block_size))
-    # 送出時用 Base64
     return base64.b64encode(encrypted).decode("utf-8")
 
 
 def _aes_decrypt(encrypt_info: str) -> dict:
-    """
-    PayUni 回傳的 EncryptInfo 可能是 Hex 或 Base64，自動判斷。
-    """
     try:
         key = PAYUNI_HASH_KEY.encode("utf-8")
         iv  = PAYUNI_HASH_IV.encode("utf-8")
 
-        # 嘗試判斷是 Hex 還是 Base64
         stripped = encrypt_info.strip()
         try:
-            # 如果全是 hex 字元，優先用 hex 解碼
             raw_bytes = binascii.unhexlify(stripped)
             print(f"[PayUni _aes_decrypt] 使用 Hex 解碼")
         except Exception:
-            # 否則用 Base64
             raw_bytes = base64.b64decode(stripped)
             print(f"[PayUni _aes_decrypt] 使用 Base64 解碼")
 
@@ -103,17 +96,61 @@ def create_payment(user_id: str, amount: int, order_id: str,
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>前往付款...</title>
+  <title>前往付款</title>
+  <style>
+    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body {{
+      font-family: -apple-system, sans-serif;
+      background: #F8F4FF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }}
+    .card {{
+      background: white;
+      border-radius: 16px;
+      padding: 40px 32px;
+      text-align: center;
+      box-shadow: 0 4px 20px rgba(107,79,160,0.15);
+      max-width: 360px;
+      width: 100%;
+    }}
+    .icon {{ font-size: 48px; margin-bottom: 16px; }}
+    h2 {{ color: #6B4FA0; font-size: 20px; margin-bottom: 8px; }}
+    .sub {{ color: #888; font-size: 14px; margin-bottom: 28px; }}
+    .btn {{
+      display: block;
+      width: 100%;
+      padding: 16px;
+      background: #6B4FA0;
+      color: white;
+      font-size: 17px;
+      font-weight: bold;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      letter-spacing: 1px;
+    }}
+    .btn:active {{ background: #4A3080; }}
+    .safe {{ color: #aaa; font-size: 12px; margin-top: 16px; }}
+  </style>
 </head>
-<body onload="document.forms[0].submit()"
-      style="font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;">
-  <form method="POST" action="{PAYUNI_API_URL}">
-    <input type="hidden" name="MerID"       value="{PAYUNI_MERCHANT_ID}">
-    <input type="hidden" name="Version"     value="2.0">
-    <input type="hidden" name="EncryptInfo" value="{encrypt_info}">
-    <input type="hidden" name="HashInfo"    value="{hash_info}">
-  </form>
-  <p style="color:#6B4FA0;">⏳ 正在跳轉至付款頁面，請稍候...</p>
+<body>
+  <div class="card">
+    <div class="icon">💳</div>
+    <h2>前往 PAYUNi 付款</h2>
+    <p class="sub">請點下方按鈕完成付款<br>將跳轉至安全付款頁面</p>
+    <form method="POST" action="{PAYUNI_API_URL}">
+      <input type="hidden" name="MerID"       value="{PAYUNI_MERCHANT_ID}">
+      <input type="hidden" name="Version"     value="2.0">
+      <input type="hidden" name="EncryptInfo" value="{encrypt_info}">
+      <input type="hidden" name="HashInfo"    value="{hash_info}">
+      <button type="submit" class="btn">前往付款 →</button>
+    </form>
+    <p class="safe">🔒 由 PAYUNi 提供安全加密付款</p>
+  </div>
 </body>
 </html>"""
 
@@ -140,9 +177,6 @@ def get_notify_data(form_data: dict) -> dict:
 
 
 def get_return_data(form_data: dict) -> dict:
-    """
-    ReturnURL 回傳：Status 在外層，EncryptInfo 解密後有完整資料。
-    """
     outer_status = form_data.get("Status", "")
     encrypt_info = form_data.get("EncryptInfo", "")
 
@@ -151,7 +185,6 @@ def get_return_data(form_data: dict) -> dict:
     else:
         inner = {}
 
-    # 外層 Status 優先
     if outer_status:
         inner["Status"] = outer_status
 
