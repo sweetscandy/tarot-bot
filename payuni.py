@@ -11,26 +11,25 @@ PAYUNI_HASH_IV     = os.environ.get("PAYUNI_HASH_IV",  "6DJBnqZ8VP5XW8Z7")
 
 PAYUNI_API_URL = "https://api.payuni.com.tw/api/pay"
 
-# ★ 啟動時立即印出金鑰狀態（部署後在 Render logs 可見）
 print(f"[PayUni 初始化] MerchantID={PAYUNI_MERCHANT_ID}")
 print(f"[PayUni 初始化] HashKey 長度={len(PAYUNI_HASH_KEY)}, 前4碼={PAYUNI_HASH_KEY[:4]}")
 print(f"[PayUni 初始化] HashIV  長度={len(PAYUNI_HASH_IV)},  前4碼={PAYUNI_HASH_IV[:4]}")
 
 
 def _aes_encrypt(data: dict) -> str:
-    plain = "&".join(f"{k}={v}" for k, v in data.items())
-    key   = PAYUNI_HASH_KEY.encode("utf-8")
-    iv    = PAYUNI_HASH_IV.encode("utf-8")
+    plain  = "&".join(f"{k}={v}" for k, v in data.items())
+    key    = PAYUNI_HASH_KEY.encode("utf-8")
+    iv     = PAYUNI_HASH_IV.encode("utf-8")
     cipher = AES.new(key, AES.MODE_CBC, iv)
     encrypted = cipher.encrypt(pad(plain.encode("utf-8"), AES.block_size))
     return base64.b64encode(encrypted).decode("utf-8")
 
 
 def _aes_decrypt(encrypt_info: str) -> dict:
-    key  = PAYUNI_HASH_KEY.encode("utf-8")
-    iv   = PAYUNI_HASH_IV.encode("utf-8")
+    key    = PAYUNI_HASH_KEY.encode("utf-8")
+    iv     = PAYUNI_HASH_IV.encode("utf-8")
     cipher = AES.new(key, AES.MODE_CBC, iv)
-    raw  = unpad(cipher.decrypt(base64.b64decode(encrypt_info)), AES.block_size)
+    raw    = unpad(cipher.decrypt(base64.b64decode(encrypt_info)), AES.block_size)
     result = {}
     for part in raw.decode("utf-8").split("&"):
         if "=" in part:
@@ -40,7 +39,8 @@ def _aes_decrypt(encrypt_info: str) -> dict:
 
 
 def _generate_hash_code(encrypt_info: str) -> str:
-    raw = f"HashKey={PAYUNI_HASH_KEY}&{encrypt_info}&HashIV={PAYUNI_HASH_IV}"
+    # ★ 修正：加入 EncryptInfo= 前綴
+    raw = f"HashKey={PAYUNI_HASH_KEY}&EncryptInfo={encrypt_info}&HashIV={PAYUNI_HASH_IV}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest().upper()
 
 
@@ -62,13 +62,11 @@ def create_payment(user_id: str, amount: int, order_id: str,
         "TimeStamp":       str(int(datetime.datetime.now().timestamp())),
     }
 
-    # ★ 除錯：印出加密前的參數
     print(f"[PayUni create_payment] 原始參數: {params}")
 
     encrypt_info = _aes_encrypt(params)
     hash_code    = _generate_hash_code(encrypt_info)
 
-    # ★ 除錯：印出加密結果
     print(f"[PayUni create_payment] MerchantNo={PAYUNI_MERCHANT_ID}")
     print(f"[PayUni create_payment] EncryptInfo={encrypt_info}")
     print(f"[PayUni create_payment] HashCode={hash_code}")
