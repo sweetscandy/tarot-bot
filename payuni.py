@@ -29,19 +29,24 @@ def _aes_encrypt(data: dict) -> str:
 
 
 def _aes_decrypt(encrypt_info: str) -> dict:
-    key    = PAYUNI_HASH_KEY.encode("utf-8")
-    iv     = PAYUNI_HASH_IV.encode("utf-8")
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    raw    = unpad(
-        cipher.decrypt(base64.b64decode(encrypt_info)),
-        AES.block_size
-    )
-    result = {}
-    for part in raw.decode("utf-8").split("&"):
-        if "=" in part:
-            k, v = part.split("=", 1)
-            result[k] = urllib.parse.unquote(v)
-    return result
+    try:
+        key    = PAYUNI_HASH_KEY.encode("utf-8")
+        iv     = PAYUNI_HASH_IV.encode("utf-8")
+        cipher = AES.new(key, AES.MODE_CBC, iv)
+        raw    = unpad(
+            cipher.decrypt(base64.b64decode(encrypt_info)),
+            AES.block_size
+        )
+        result = {}
+        for part in raw.decode("utf-8").split("&"):
+            if "=" in part:
+                k, v = part.split("=", 1)
+                result[k] = urllib.parse.unquote(v)
+        print(f"[PayUni _aes_decrypt] 解密成功: {result}")
+        return result
+    except Exception as e:
+        print(f"[PayUni _aes_decrypt] 解密失敗: {e}")
+        return {}
 
 
 def _generate_hash_info(encrypt_info: str) -> str:
@@ -103,7 +108,10 @@ def create_payment(user_id: str, amount: int, order_id: str,
 def verify_notify(form_data: dict) -> bool:
     received     = form_data.get("HashInfo", "")
     encrypt_info = form_data.get("EncryptInfo", "")
-    expected     = _generate_hash_info(encrypt_info)
+    if not encrypt_info:
+        print(f"[PayUni verify_notify] EncryptInfo 為空，驗簽失敗")
+        return False
+    expected = _generate_hash_info(encrypt_info)
     print(f"[PayUni verify_notify] received={received[:20]}, expected={expected[:20]}")
     return received.upper() == expected.upper()
 
@@ -113,6 +121,29 @@ def get_notify_data(form_data: dict) -> dict:
     result = _aes_decrypt(encrypt_info)
     print(f"[PayUni get_notify_data] 解密結果: {result}")
     return result
+
+
+# ★ 新增：ReturnURL (confirm) 專用解析
+def get_return_data(form_data: dict) -> dict:
+    """
+    PayUni ReturnURL 回傳時，Status 在外層 form_data，
+    EncryptInfo 解密後有完整交易資料。
+    合併兩者回傳，方便 /pay/confirm 使用。
+    """
+    outer_status = form_data.get("Status", "")
+    encrypt_info = form_data.get("EncryptInfo", "")
+
+    if encrypt_info:
+        inner = _aes_decrypt(encrypt_info)
+    else:
+        inner = {}
+
+    # 外層 Status 優先（PayUni ReturnURL 的 Status 在外層）
+    if outer_status and "Status" not in inner:
+        inner["Status"] = outer_status
+
+    print(f"[PayUni get_return_data] 合併結果: {inner}")
+    return inner
 
 
 def is_payment_success(data: dict) -> bool:
