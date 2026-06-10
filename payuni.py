@@ -3,6 +3,7 @@ import base64
 import datetime
 import os
 import urllib.parse
+import binascii
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 
@@ -25,18 +26,32 @@ def _aes_encrypt(data: dict) -> str:
     iv     = PAYUNI_HASH_IV.encode("utf-8")
     cipher = AES.new(key, AES.MODE_CBC, iv)
     encrypted = cipher.encrypt(pad(plain.encode("utf-8"), AES.block_size))
+    # 送出時用 Base64
     return base64.b64encode(encrypted).decode("utf-8")
 
 
 def _aes_decrypt(encrypt_info: str) -> dict:
+    """
+    PayUni 回傳的 EncryptInfo 可能是 Hex 或 Base64，自動判斷。
+    """
     try:
-        key    = PAYUNI_HASH_KEY.encode("utf-8")
-        iv     = PAYUNI_HASH_IV.encode("utf-8")
+        key = PAYUNI_HASH_KEY.encode("utf-8")
+        iv  = PAYUNI_HASH_IV.encode("utf-8")
+
+        # 嘗試判斷是 Hex 還是 Base64
+        stripped = encrypt_info.strip()
+        try:
+            # 如果全是 hex 字元，優先用 hex 解碼
+            raw_bytes = binascii.unhexlify(stripped)
+            print(f"[PayUni _aes_decrypt] 使用 Hex 解碼")
+        except Exception:
+            # 否則用 Base64
+            raw_bytes = base64.b64decode(stripped)
+            print(f"[PayUni _aes_decrypt] 使用 Base64 解碼")
+
         cipher = AES.new(key, AES.MODE_CBC, iv)
-        raw    = unpad(
-            cipher.decrypt(base64.b64decode(encrypt_info)),
-            AES.block_size
-        )
+        raw    = unpad(cipher.decrypt(raw_bytes), AES.block_size)
+
         result = {}
         for part in raw.decode("utf-8").split("&"):
             if "=" in part:
@@ -112,8 +127,9 @@ def verify_notify(form_data: dict) -> bool:
         print(f"[PayUni verify_notify] EncryptInfo 為空，驗簽失敗")
         return False
     expected = _generate_hash_info(encrypt_info)
-    print(f"[PayUni verify_notify] received={received[:20]}, expected={expected[:20]}")
-    return received.upper() == expected.upper()
+    ok = received.upper() == expected.upper()
+    print(f"[PayUni verify_notify] received={received[:20]}, expected={expected[:20]}, ok={ok}")
+    return ok
 
 
 def get_notify_data(form_data: dict) -> dict:
@@ -123,12 +139,9 @@ def get_notify_data(form_data: dict) -> dict:
     return result
 
 
-# ★ 新增：ReturnURL (confirm) 專用解析
 def get_return_data(form_data: dict) -> dict:
     """
-    PayUni ReturnURL 回傳時，Status 在外層 form_data，
-    EncryptInfo 解密後有完整交易資料。
-    合併兩者回傳，方便 /pay/confirm 使用。
+    ReturnURL 回傳：Status 在外層，EncryptInfo 解密後有完整資料。
     """
     outer_status = form_data.get("Status", "")
     encrypt_info = form_data.get("EncryptInfo", "")
@@ -138,8 +151,8 @@ def get_return_data(form_data: dict) -> dict:
     else:
         inner = {}
 
-    # 外層 Status 優先（PayUni ReturnURL 的 Status 在外層）
-    if outer_status and "Status" not in inner:
+    # 外層 Status 優先
+    if outer_status:
         inner["Status"] = outer_status
 
     print(f"[PayUni get_return_data] 合併結果: {inner}")
