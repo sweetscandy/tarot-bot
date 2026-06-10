@@ -2,6 +2,7 @@ import hashlib
 import base64
 import datetime
 import os
+import urllib.parse
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 
@@ -15,8 +16,9 @@ print(f"[PayUni 初始化] MerchantID={PAYUNI_MERCHANT_ID}")
 
 
 def _aes_encrypt(data: dict) -> str:
-    plain  = "&".join(f"{k}={v}" for k, v in data.items())
-    print(f"[PayUni _aes_encrypt] 明文: {plain}")
+    # ★ URL encode 每個 value，避免特殊字元問題
+    plain = "&".join(f"{k}={urllib.parse.quote(str(v), safe='')}" for k, v in data.items())
+    print(f"[PayUni _aes_encrypt] 明文(encoded): {plain}")
     key    = PAYUNI_HASH_KEY.encode("utf-8")
     iv     = PAYUNI_HASH_IV.encode("utf-8")
     cipher = AES.new(key, AES.MODE_CBC, iv)
@@ -33,7 +35,7 @@ def _aes_decrypt(encrypt_info: str) -> dict:
     for part in raw.decode("utf-8").split("&"):
         if "=" in part:
             k, v = part.split("=", 1)
-            result[k] = v
+            result[k] = urllib.parse.unquote(v)
     return result
 
 
@@ -48,11 +50,14 @@ def create_payment(user_id: str, amount: int, order_id: str,
     render_url = os.environ.get("RENDER_URL", "https://tarot-bot-qqgg.onrender.com")
     notify_url = f"{render_url}/pay/notify"
 
+    # ★ ProdDesc 只保留安全字元，移除全形符號
+    safe_desc = product_name.replace("・", "-").replace("　", " ")[:50]
+
     params = {
         "MerID":       PAYUNI_MERCHANT_ID,
         "MerOrderNo":  order_id[:30],
         "TradeAmt":    str(amount),
-        "ProdDesc":    product_name[:50],
+        "ProdDesc":    safe_desc,
         "ReturnURL":   confirm_url,
         "NotifyURL":   notify_url,
         "BackURL":     confirm_url,
@@ -89,7 +94,6 @@ def create_payment(user_id: str, amount: int, order_id: str,
 
 
 def verify_notify(form_data: dict) -> bool:
-    """驗證 PayUni 回調簽章"""
     received     = form_data.get("HashCode", "")
     encrypt_info = form_data.get("EncryptInfo", "")
     expected     = _generate_hash_code(encrypt_info)
@@ -98,7 +102,6 @@ def verify_notify(form_data: dict) -> bool:
 
 
 def get_notify_data(form_data: dict) -> dict:
-    """解密回調資料"""
     encrypt_info = form_data.get("EncryptInfo", "")
     result = _aes_decrypt(encrypt_info)
     print(f"[PayUni get_notify_data] 解密結果: {result}")
@@ -106,7 +109,6 @@ def get_notify_data(form_data: dict) -> dict:
 
 
 def is_payment_success(data: dict) -> bool:
-    """判斷付款是否成功"""
     status = data.get("Status")
     amt    = data.get("TradeAmt", 0)
     print(f"[PayUni is_payment_success] Status={status}, TradeAmt={amt}")
@@ -114,6 +116,5 @@ def is_payment_success(data: dict) -> bool:
 
 
 def get_order_id_from_notify(form_data: dict) -> str:
-    """從回調取得訂單編號"""
     data = get_notify_data(form_data)
     return data.get("MerOrderNo", "")
