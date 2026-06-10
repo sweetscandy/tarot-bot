@@ -10,7 +10,6 @@ PAYUNI_MERCHANT_ID = os.environ.get("PAYUNI_MERCHANT_ID", "U011578308")
 PAYUNI_HASH_KEY    = os.environ.get("PAYUNI_HASH_KEY", "bweawvqubQiapGNfRTQa1ETvU1SOzDS8")
 PAYUNI_HASH_IV     = os.environ.get("PAYUNI_HASH_IV",  "6DJBnqZ8VP5XW8Z7")
 
-# ★ 正確的 API URL
 PAYUNI_API_URL = "https://api.payuni.com.tw/api/upp"
 
 print(f"[PayUni 初始化] MerchantID={PAYUNI_MERCHANT_ID}")
@@ -56,15 +55,12 @@ def create_payment(user_id: str, amount: int, order_id: str,
     render_url = os.environ.get("RENDER_URL", "https://tarot-bot-qqgg.onrender.com")
     notify_url = f"{render_url}/pay/notify"
 
-    # 商品說明移除特殊符號
-    safe_desc = product_name.replace("・", "-").replace("　", " ")[:50]
-
-    # ★ MerTradeNo 限制 25 字元，格式 [A-Za-z0-9_-]
+    safe_desc    = product_name.replace("・", "-").replace("　", " ")[:50]
     mer_trade_no = order_id[:25]
 
     params = {
         "MerID":       PAYUNI_MERCHANT_ID,
-        "MerTradeNo":  mer_trade_no,        # ★ 正確欄位名
+        "MerTradeNo":  mer_trade_no,
         "TradeAmt":    str(amount),
         "ProdDesc":    safe_desc,
         "ReturnURL":   confirm_url,
@@ -77,7 +73,7 @@ def create_payment(user_id: str, amount: int, order_id: str,
     print(f"[PayUni create_payment] 原始參數: {params}")
 
     encrypt_info = _aes_encrypt(params)
-    hash_info    = _generate_hash_info(encrypt_info)  # ★ 改名為 hash_info
+    hash_info    = _generate_hash_info(encrypt_info)
 
     print(f"[PayUni create_payment] EncryptInfo={encrypt_info[:50]}...")
     print(f"[PayUni create_payment] HashInfo={hash_info}")
@@ -92,7 +88,7 @@ def create_payment(user_id: str, amount: int, order_id: str,
 <body onload="document.forms[0].submit()"
       style="font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;">
   <form method="POST" action="{PAYUNI_API_URL}">
-    <input type="hidden" name="MerchantNo"  value="{PAYUNI_MERCHANT_ID}">
+    <input type="hidden" name="MerID"       value="{PAYUNI_MERCHANT_ID}">
     <input type="hidden" name="Version"     value="2.0">
     <input type="hidden" name="EncryptInfo" value="{encrypt_info}">
     <input type="hidden" name="HashInfo"    value="{hash_info}">
@@ -124,10 +120,9 @@ def is_payment_success(data: dict) -> bool:
     trade_status = data.get("TradeStatus", "")
     amt          = data.get("TradeAmt", 0)
     print(f"[PayUni is_payment_success] Status={status}, TradeStatus={trade_status}, TradeAmt={amt}")
-    # Status=SUCCESS 且 TradeStatus=1 才是真正付款成功
     return status == "SUCCESS" and str(trade_status) == "1"
 
 
 def get_order_id_from_notify(form_data: dict) -> str:
     data = get_notify_data(form_data)
-    return data.get("MerTradeNo", "")   # ★ 正確欄位名
+    return data.get("MerTradeNo", "")
