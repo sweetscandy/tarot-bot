@@ -2362,13 +2362,17 @@ def ecpay_notify():
         if not verify_notify(form_data):
             print(f"[PayUni notify] 驗簽失敗：{form_data}")
             return "failure", 200
-        if is_payment_success(form_data):
-            order_id = get_order_id_from_notify(form_data)
+        # ★ 新版：先解密 EncryptInfo，再判斷付款狀態
+        from payuni import get_notify_data
+        notify_data = get_notify_data(form_data)
+        if is_payment_success(notify_data):
+            order_id = notify_data.get("MerchantOrderNo", "")
             _activate_payment(order_id)
         return "success", 200
     except Exception as e:
         print(f"[payuni_notify 錯誤] {e}")
         return "failure", 200
+
 
 
 
