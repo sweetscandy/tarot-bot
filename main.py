@@ -960,7 +960,7 @@ def _run_spiritual_background(line_user_id, data, zodiac):
 # ══════════════════════════════════════════
 
 def _run_fortune_stick_background(line_user_id, category, question, stick):
-        try:
+    try:
         time.sleep(random.uniform(12, 15))
 
         user_prompt = f"""請進行求籤解析：
@@ -1011,6 +1011,7 @@ def _run_fortune_stick_background(line_user_id, category, question, stick):
     except Exception as e:
         print(f"[求籤背景錯誤] {line_user_id}: {e}")
         push_text(line_user_id, "✨ 星辰訊號有些微干擾，請再試一次 🙏")
+
 
 
 # ══════════════════════════════════════════
