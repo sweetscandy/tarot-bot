@@ -1,6 +1,5 @@
 import hashlib
 import base64
-import json
 import datetime
 import os
 from Crypto.Cipher import AES
@@ -12,31 +11,26 @@ PAYUNI_HASH_IV     = os.environ.get("PAYUNI_HASH_IV",  "6DJBnqZ8VP5XW8Z7")
 
 PAYUNI_API_URL = "https://api.payuni.com.tw/api/pay"
 
+# ★ 啟動時立即印出金鑰狀態（部署後在 Render logs 可見）
+print(f"[PayUni 初始化] MerchantID={PAYUNI_MERCHANT_ID}")
+print(f"[PayUni 初始化] HashKey 長度={len(PAYUNI_HASH_KEY)}, 前4碼={PAYUNI_HASH_KEY[:4]}")
+print(f"[PayUni 初始化] HashIV  長度={len(PAYUNI_HASH_IV)},  前4碼={PAYUNI_HASH_IV[:4]}")
+
 
 def _aes_encrypt(data: dict) -> str:
-    """
-    AES-256-CBC 加密
-    1. dict → URL query string（key=value&key=value）
-    2. PKCS7 padding
-    3. Base64 encode → 回傳 EncryptInfo
-    """
     plain = "&".join(f"{k}={v}" for k, v in data.items())
-    key   = PAYUNI_HASH_KEY.encode("utf-8")   # 32 bytes
-    iv    = PAYUNI_HASH_IV.encode("utf-8")    # 16 bytes
+    key   = PAYUNI_HASH_KEY.encode("utf-8")
+    iv    = PAYUNI_HASH_IV.encode("utf-8")
     cipher = AES.new(key, AES.MODE_CBC, iv)
     encrypted = cipher.encrypt(pad(plain.encode("utf-8"), AES.block_size))
     return base64.b64encode(encrypted).decode("utf-8")
 
 
 def _aes_decrypt(encrypt_info: str) -> dict:
-    """
-    AES-256-CBC 解密（用於解析 Notify 回傳的 EncryptInfo）
-    """
     key  = PAYUNI_HASH_KEY.encode("utf-8")
     iv   = PAYUNI_HASH_IV.encode("utf-8")
     cipher = AES.new(key, AES.MODE_CBC, iv)
     raw  = unpad(cipher.decrypt(base64.b64decode(encrypt_info)), AES.block_size)
-    # 解出來是 key=value&key=value 格式
     result = {}
     for part in raw.decode("utf-8").split("&"):
         if "=" in part:
@@ -46,23 +40,16 @@ def _aes_decrypt(encrypt_info: str) -> dict:
 
 
 def _generate_hash_code(encrypt_info: str) -> str:
-    """
-    HashCode = SHA256(HashKey + EncryptInfo + HashIV) → 大寫
-    """
     raw = f"HashKey={PAYUNI_HASH_KEY}&{encrypt_info}&HashIV={PAYUNI_HASH_IV}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest().upper()
 
 
 def create_payment(user_id: str, amount: int, order_id: str,
                    product_name: str, confirm_url: str):
-    """
-    產生 PayUni 付款表單 HTML（POST 自動跳轉）
-    回傳 (html_str, order_id)
-    """
+
     render_url = os.environ.get("RENDER_URL", "https://tarot-bot-qqgg.onrender.com")
     notify_url = f"{render_url}/pay/notify"
 
-    # ① 組成要加密的參數
     params = {
         "MerchantOrderNo": order_id[:30],
         "Amt":             str(amount),
@@ -75,13 +62,17 @@ def create_payment(user_id: str, amount: int, order_id: str,
         "TimeStamp":       str(int(datetime.datetime.now().timestamp())),
     }
 
-    # ② AES 加密 → EncryptInfo
+    # ★ 除錯：印出加密前的參數
+    print(f"[PayUni create_payment] 原始參數: {params}")
+
     encrypt_info = _aes_encrypt(params)
+    hash_code    = _generate_hash_code(encrypt_info)
 
-    # ③ SHA256 簽章 → HashCode
-    hash_code = _generate_hash_code(encrypt_info)
+    # ★ 除錯：印出加密結果
+    print(f"[PayUni create_payment] MerchantNo={PAYUNI_MERCHANT_ID}")
+    print(f"[PayUni create_payment] EncryptInfo={encrypt_info}")
+    print(f"[PayUni create_payment] HashCode={hash_code}")
 
-    # ④ 組成 POST 表單（只需三個欄位）
     html = f"""<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8">
@@ -103,37 +94,30 @@ def create_payment(user_id: str, amount: int, order_id: str,
 
 
 def verify_notify(form_data: dict) -> bool:
-    """
-    驗證 PayUni Notify 的 HashCode
-    """
     received     = form_data.get("HashCode", "")
     encrypt_info = form_data.get("EncryptInfo", "")
     expected     = _generate_hash_code(encrypt_info)
+    print(f"[PayUni verify_notify] received={received[:20]}, expected={expected[:20]}")
     return received.upper() == expected.upper()
 
 
 def get_notify_data(form_data: dict) -> dict:
-    """
-    解密 Notify 的 EncryptInfo，回傳明文 dict
-    """
     encrypt_info = form_data.get("EncryptInfo", "")
-    return _aes_decrypt(encrypt_info)
+    result = _aes_decrypt(encrypt_info)
+    print(f"[PayUni get_notify_data] 解密結果: {result}")
+    return result
 
 
 def is_payment_success(data: dict) -> bool:
-    """
-    判斷付款是否成功（傳入解密後的 dict）
-    Status = SUCCESS 且 Amt > 0
-    """
+    status = data.get("Status")
+    amt    = data.get("Amt", 0)
+    print(f"[PayUni is_payment_success] Status={status}, Amt={amt}")
     return (
-        data.get("Status") == "SUCCESS" and
-        int(data.get("Amt", 0)) > 0
+        status == "SUCCESS" and
+        int(amt) > 0
     )
 
 
 def get_order_id_from_notify(form_data: dict) -> str:
-    """
-    從 Notify 取得訂單編號（先解密再取值）
-    """
     data = get_notify_data(form_data)
     return data.get("MerchantOrderNo", "")
