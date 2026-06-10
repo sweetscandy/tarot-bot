@@ -1,5 +1,3 @@
-這是完整的 `main.py`，只修改了 `/pay/notify` 和 `/pay/confirm` 兩個路由，其他完全不動：
-
 ```python
 from flask import Flask, request, abort
 from linebot.v3.webhook import WebhookHandler
