@@ -15,7 +15,6 @@ print(f"[PayUni 初始化] MerchantID={PAYUNI_MERCHANT_ID}")
 
 
 def _aes_encrypt(data: dict) -> str:
-    """將參數 dict 加密為 EncryptInfo"""
     plain  = "&".join(f"{k}={v}" for k, v in data.items())
     print(f"[PayUni _aes_encrypt] 明文: {plain}")
     key    = PAYUNI_HASH_KEY.encode("utf-8")
@@ -26,7 +25,6 @@ def _aes_encrypt(data: dict) -> str:
 
 
 def _aes_decrypt(encrypt_info: str) -> dict:
-    """解密 EncryptInfo 回 dict"""
     key    = PAYUNI_HASH_KEY.encode("utf-8")
     iv     = PAYUNI_HASH_IV.encode("utf-8")
     cipher = AES.new(key, AES.MODE_CBC, iv)
@@ -40,7 +38,6 @@ def _aes_decrypt(encrypt_info: str) -> dict:
 
 
 def _generate_hash_code(encrypt_info: str) -> str:
-    """產生 HashCode = SHA256(HashKey=...&EncryptInfo=...&HashIV=...)"""
     raw = f"HashKey={PAYUNI_HASH_KEY}&EncryptInfo={encrypt_info}&HashIV={PAYUNI_HASH_IV}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest().upper()
 
@@ -51,17 +48,16 @@ def create_payment(user_id: str, amount: int, order_id: str,
     render_url = os.environ.get("RENDER_URL", "https://tarot-bot-qqgg.onrender.com")
     notify_url = f"{render_url}/pay/notify"
 
-    # ★ 關鍵修正：加入 MerID，且欄位名稱完全符合 PayUni 文件
     params = {
-        "MerID":           PAYUNI_MERCHANT_ID,   # ← 必填！之前缺少這個
-        "MerOrderNo":      order_id[:30],         # ← PayUni 用 MerOrderNo，不是 MerchantOrderNo
-        "TradeAmt":        str(amount),            # ← PayUni 用 TradeAmt，不是 Amt
-        "ProdDesc":        product_name[:50],      # ← PayUni 用 ProdDesc，不是 ItemDesc
-        "ReturnURL":       confirm_url,
-        "NotifyURL":       notify_url,
-        "BackURL":         confirm_url,
-        "Timestamp":       str(int(datetime.datetime.now().timestamp())),
-        "RespondType":     "JSON",
+        "MerID":       PAYUNI_MERCHANT_ID,
+        "MerOrderNo":  order_id[:30],
+        "TradeAmt":    str(amount),
+        "ProdDesc":    product_name[:50],
+        "ReturnURL":   confirm_url,
+        "NotifyURL":   notify_url,
+        "BackURL":     confirm_url,
+        "Timestamp":   str(int(datetime.datetime.now().timestamp())),
+        "RespondType": "JSON",
     }
 
     print(f"[PayUni create_payment] 原始參數: {params}")
@@ -81,12 +77,43 @@ def create_payment(user_id: str, amount: int, order_id: str,
 <body onload="document.forms[0].submit()"
       style="font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;">
   <form method="POST" action="{PAYUNI_API_URL}">
-    <input type="hidden" name="MerchantNo"   value="{PAYUNI_MERCHANT_ID}">
-    <input type="hidden" name="EncryptInfo"  value="{encrypt_info}">
-    <input type="hidden" name="HashCode"     value="{hash_code}">
+    <input type="hidden" name="MerchantNo"  value="{PAYUNI_MERCHANT_ID}">
+    <input type="hidden" name="EncryptInfo" value="{encrypt_info}">
+    <input type="hidden" name="HashCode"    value="{hash_code}">
   </form>
   <p style="color:#6B4FA0;">⏳ 正在跳轉至付款頁面，請稍候...</p>
 </body>
 </html>"""
 
     return html, order_id[:30]
+
+
+def verify_notify(form_data: dict) -> bool:
+    """驗證 PayUni 回調簽章"""
+    received     = form_data.get("HashCode", "")
+    encrypt_info = form_data.get("EncryptInfo", "")
+    expected     = _generate_hash_code(encrypt_info)
+    print(f"[PayUni verify_notify] received={received[:20]}, expected={expected[:20]}")
+    return received.upper() == expected.upper()
+
+
+def get_notify_data(form_data: dict) -> dict:
+    """解密回調資料"""
+    encrypt_info = form_data.get("EncryptInfo", "")
+    result = _aes_decrypt(encrypt_info)
+    print(f"[PayUni get_notify_data] 解密結果: {result}")
+    return result
+
+
+def is_payment_success(data: dict) -> bool:
+    """判斷付款是否成功"""
+    status = data.get("Status")
+    amt    = data.get("TradeAmt", 0)
+    print(f"[PayUni is_payment_success] Status={status}, TradeAmt={amt}")
+    return status == "SUCCESS" and int(amt) > 0
+
+
+def get_order_id_from_notify(form_data: dict) -> str:
+    """從回調取得訂單編號"""
+    data = get_notify_data(form_data)
+    return data.get("MerOrderNo", "")
