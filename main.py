@@ -12,7 +12,7 @@ from linebot.v3.webhooks import (
 from linebot.v3.exceptions import InvalidSignatureError
 from groq import Groq
 from supabase import create_client
-from ecpay import create_payment as ecpay_create, verify_notify, is_payment_success
+from payuni import create_payment as ecpay_create, verify_notify, is_payment_success, get_order_id_from_notify
 import os, random, datetime, pytz, threading, uuid, time
 import requests
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -2300,8 +2300,12 @@ def shop_page():
 
 @app.route("/push-now", methods=["GET"])
 def push_now():
+    token = request.args.get("token", "")
+    if token != os.environ.get("PUSH_SECRET", ""):
+        return "Unauthorized", 403
     do_daily_push()
     return "推播已觸發", 200
+
 
 
 # ══════════════════════════════════════════
@@ -2356,26 +2360,28 @@ def ecpay_notify():
     try:
         form_data = request.form.to_dict()
         if not verify_notify(form_data):
-            return "0|ErrorMessage", 200
+            print(f"[PayUni notify] 驗簽失敗：{form_data}")
+            return "failure", 200
         if is_payment_success(form_data):
-            order_id = form_data.get("MerchantTradeNo")
+            order_id = get_order_id_from_notify(form_data)
             _activate_payment(order_id)
-        return "1|OK", 200
+        return "success", 200
     except Exception as e:
-        print(f"[ecpay_notify 錯誤] {e}")
-        return "0|ErrorMessage", 200
+        print(f"[payuni_notify 錯誤] {e}")
+        return "failure", 200
+
 
 
 @app.route("/pay/confirm", methods=["GET", "POST"])
 def ecpay_confirm():
     try:
         if request.method == "POST":
-            rtn_code = request.form.get("RtnCode", "")
-            order_id = request.form.get("MerchantTradeNo", "")
+            status   = request.form.get("Status", "")
+            order_id = request.form.get("MerchantOrderNo", "")
         else:
-            rtn_code = request.args.get("RtnCode", "")
-            order_id = request.args.get("MerchantTradeNo", "")
-        if rtn_code == "1" and order_id:
+            status   = request.args.get("Status", "")
+            order_id = request.args.get("MerchantOrderNo", "")
+        if status == "SUCCESS" and order_id:
             _activate_payment(order_id)
             return """<html>
             <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -4249,33 +4255,8 @@ def handle_postback(event):
         return
 
 
-# ══════════════════════════════════════════
-#  handle_message 補充：follow_up 追問狀態
-# ══════════════════════════════════════════
-# 在 handle_message 的 pending_state 區塊末尾，
-# 加入以下 elif 分支（接在 wealth 的 elif 之後）：
 
-"""
-        elif mode == "follow_up":
-            if step == "question":
-                service_type = state.get("service_type")
-                service_id   = state.get("service_id")
-                follow_up_num = state.get("follow_up_num", 1)
-                pending_state.pop(line_user_id, None)
-                wait_msg = random.choice(WAITING_MSGS_TIANBOOK)
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=[TextMessage(text=wait_msg)]
-                    ))
-                t = threading.Thread(
-                    target=_run_follow_up_background,
-                    args=(line_user_id, service_type, user_msg, service_id, follow_up_num),
-                    daemon=True
-                )
-                t.start()
-                return
-"""
+
 
 
 # ══════════════════════════════════════════
@@ -4283,8 +4264,14 @@ def handle_postback(event):
 # ══════════════════════════════════════════
 
 scheduler = BackgroundScheduler(timezone="Asia/Taipei")
-scheduler.add_job(do_daily_push, "cron", hour=8, minute=0)
+scheduler.add_job(
+    do_daily_push, "cron",
+    hour=8, minute=0,
+    id="daily_push",          # ← 加上固定 ID
+    replace_existing=True     # ← 重複時自動替換，不會疊加
+)
 scheduler.start()
+
 
 
 # ══════════════════════════════════════════
