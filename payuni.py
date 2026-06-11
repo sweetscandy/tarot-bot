@@ -2,6 +2,8 @@ import hashlib
 import base64
 import datetime
 import os
+import time
+import uuid
 import urllib.parse
 import binascii
 from Crypto.Cipher import AES
@@ -14,6 +16,15 @@ PAYUNI_HASH_IV     = os.environ.get("PAYUNI_HASH_IV",  "6DJBnqZ8VP5XW8Z7")
 PAYUNI_API_URL = "https://api.payuni.com.tw/api/upp"
 
 print(f"[PayUni 初始化] MerchantID={PAYUNI_MERCHANT_ID}")
+
+
+def _generate_trade_no() -> str:
+    """產生唯一 MerTradeNo，格式：時間戳10碼 + 隨機4碼 = 14碼（符合PayUni ≤20碼限制）"""
+    ts   = str(int(time.time()))           # 10碼
+    rand = uuid.uuid4().hex[:4].upper()    # 4碼
+    trade_no = ts + rand
+    print(f"[PayUni] 產生 MerTradeNo: {trade_no} (長度={len(trade_no)})")
+    return trade_no
 
 
 def _aes_encrypt(data: dict) -> str:
@@ -36,14 +47,14 @@ def _aes_decrypt(encrypt_info: str) -> dict:
 
         stripped = encrypt_info.strip()
 
-        # 嘗試 Hex 解碼
+        # 嘗試第一層 Hex 解碼
         try:
             raw_bytes = binascii.unhexlify(stripped)
             print(f"[PayUni _aes_decrypt] 第一層 Hex 解碼成功，長度={len(raw_bytes)}")
 
-            # 檢查是否還有第二層 Base64
+            # 嘗試第二層 Base64 解碼
             try:
-                inner = raw_bytes.decode("utf-8")
+                inner     = raw_bytes.decode("utf-8")
                 raw_bytes = base64.b64decode(inner)
                 print(f"[PayUni _aes_decrypt] 第二層 Base64 解碼成功，長度={len(raw_bytes)}")
             except Exception:
@@ -52,6 +63,11 @@ def _aes_decrypt(encrypt_info: str) -> dict:
         except Exception:
             raw_bytes = base64.b64decode(stripped)
             print(f"[PayUni _aes_decrypt] 使用 Base64 解碼，長度={len(raw_bytes)}")
+
+        # ★ 長度檢查：非 16 倍數代表是 PayUni 固定錯誤訊息，無法解密
+        if len(raw_bytes) % 16 != 0:
+            print(f"[PayUni _aes_decrypt] 長度 {len(raw_bytes)} 非 16 的倍數，為 PayUni 固定錯誤訊息，跳過解密")
+            return {}
 
         cipher = AES.new(key, AES.MODE_CBC, iv)
         raw    = unpad(cipher.decrypt(raw_bytes), AES.block_size)
@@ -69,7 +85,6 @@ def _aes_decrypt(encrypt_info: str) -> dict:
         return {}
 
 
-
 def _generate_hash_info(encrypt_info: str) -> str:
     raw = f"HashKey={PAYUNI_HASH_KEY}&EncryptInfo={encrypt_info}&HashIV={PAYUNI_HASH_IV}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest().upper()
@@ -82,7 +97,7 @@ def create_payment(user_id: str, amount: int, order_id: str,
     notify_url = f"{render_url}/pay/notify"
 
     safe_desc    = product_name.replace("・", "-").replace("　", " ")[:50]
-    mer_trade_no = order_id[:25]
+    mer_trade_no = _generate_trade_no()  # ★ 改用新函式，確保 ≤20 碼且每次唯一
 
     params = {
         "MerID":       PAYUNI_MERCHANT_ID,
