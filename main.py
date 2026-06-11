@@ -869,9 +869,9 @@ def _run_weekly_fortune_background(line_user_id, reading_type, zodiac, user):
 語氣溫柔神秘，像老師給學生的週一叮嚀。"""
             prefix = f"🀄 本週八字運勢｜{week_str}\n\n"
 
-                elif reading_type == "iching":
-                    hexagram = random.choice(ICHING_HEXAGRAMS)
-                    user_prompt = f"""{zodiac_hint}本週（{week_str}）起卦得【{hexagram}】。
+        elif reading_type == "iching":
+            hexagram = random.choice(ICHING_HEXAGRAMS)
+            user_prompt = f"""{zodiac_hint}本週（{week_str}）起卦得【{hexagram}】。
 請以易經卦象角度，給出約350字的一週運勢解讀，包含：
 - 卦象本週寓意
 - 感情運勢
@@ -879,40 +879,41 @@ def _run_weekly_fortune_background(line_user_id, reading_type, zodiac, user):
 - 本週行動建議
 - 一句鼓勵結語
 語氣溫柔神秘，像老師給學生的週一叮嚀。"""
-                    prefix = f"☯️ 本週易經運勢｜{week_str}\n\n卦象：【{hexagram}】\n\n"
+            prefix = f"☯️ 本週易經運勢｜{week_str}\n\n卦象：【{hexagram}】\n\n"
 
-                else:
-                    return
+        else:
+            return
 
-                chat_completion = groq_client.chat.completions.create(
-                    messages=[
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    model="llama-3.3-70b-versatile",
-                )
-                response_text = chat_completion.choices[0].message.content
+        chat_completion = groq_client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt}
+            ],
+            model="llama-3.3-70b-versatile",
+        )
+        response_text = chat_completion.choices[0].message.content
 
-                try:
-                    supabase.table("tarot_logs").insert({
-                        "line_user_id": line_user_id,
-                        "card_name": f"一週運勢｜{reading_type}",
-                        "reading": response_text,
-                        "category": "一週運勢",
-                        "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
-                    }).execute()
-                except Exception as e:
-                    print(f"[一週運勢 tarot_logs 寫入錯誤] {e}")
+        try:
+            supabase.table("tarot_logs").insert({
+                "line_user_id": line_user_id,
+                "card_name": f"一週運勢｜{reading_type}",
+                "reading": response_text,
+                "category": "一週運勢",
+                "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
+            }).execute()
+        except Exception as e:
+            print(f"[一週運勢 tarot_logs 寫入錯誤] {e}")
 
-                if user:
-                    increment_free_reading(line_user_id, user)
+        if user:
+            increment_free_reading(line_user_id, user)
 
-                footer = get_lucky_item_text()
-                push_text(line_user_id, prefix + response_text + footer)
+        footer = get_lucky_item_text()
+        push_text(line_user_id, prefix + response_text + footer)
 
-            except Exception as e:
-                print(f"[一週運勢背景錯誤] {line_user_id}: {e}")
-                push_text(line_user_id, "✨ 星辰訊號有些微干擾，請再傳一次訊息給老師 🙏")
+    except Exception as e:
+        print(f"[一週運勢背景錯誤] {line_user_id}: {e}")
+        push_text(line_user_id, "✨ 星辰訊號有些微干擾，請再傳一次訊息給老師 🙏")
+
 
 
 # ══════════════════════════════════════════
