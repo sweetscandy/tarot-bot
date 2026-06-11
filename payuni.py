@@ -12,7 +12,6 @@ from Crypto.Util.Padding import pad, unpad
 PAYUNI_MERCHANT_ID = os.environ.get("PAYUNI_MERCHANT_ID", "U011578308")
 PAYUNI_HASH_KEY    = os.environ.get("PAYUNI_HASH_KEY", "bweawvqubQiapGNfRTQa1ETvU1SOzDS8")
 PAYUNI_HASH_IV     = os.environ.get("PAYUNI_HASH_IV",  "6DJBnqZ8VP5XW8Z7")
-# AES_TYPE: "base64" 或 "hex"，對應 PayUni 後台 AesType 設定
 PAYUNI_AES_TYPE    = os.environ.get("PAYUNI_AES_TYPE", "base64").lower()
 
 PAYUNI_API_URL = "https://api.payuni.com.tw/api/upp"
@@ -21,7 +20,6 @@ print(f"[PayUni 初始化] MerchantID={PAYUNI_MERCHANT_ID}, AES_TYPE={PAYUNI_AES
 
 
 def _generate_trade_no() -> str:
-    """產生唯一 MerTradeNo，格式：時間戳10碼 + 隨機4碼 = 14碼（符合PayUni ≤20碼限制）"""
     ts       = str(int(time.time()))
     rand     = uuid.uuid4().hex[:4].upper()
     trade_no = ts + rand
@@ -42,10 +40,11 @@ def _aes_encrypt(data: dict) -> str:
 
     if PAYUNI_AES_TYPE == "hex":
         result = encrypted.hex()
-        print(f"[PayUni _aes_encrypt] 使用 Hex 編碼，結果前50碼: {result[:50]}")
+        print(f"[PayUni _aes_encrypt] 使用 Hex 編碼: {result[:50]}")
     else:
-        result = base64.b64encode(encrypted).decode("utf-8")
-        print(f"[PayUni _aes_encrypt] 使用 Base64 編碼，結果前50碼: {result[:50]}")
+        # ★ 使用 urlsafe_b64encode，避免 + / 在 form POST 時被變形
+        result = base64.urlsafe_b64encode(encrypted).decode("utf-8")
+        print(f"[PayUni _aes_encrypt] 使用 URLSafe Base64 編碼: {result[:50]}")
 
     return result
 
@@ -57,23 +56,21 @@ def _aes_decrypt(encrypt_info: str) -> dict:
         stripped = encrypt_info.strip()
 
         if PAYUNI_AES_TYPE == "hex":
-            # Hex 模式：直接 Hex 解碼
             try:
                 raw_bytes = binascii.unhexlify(stripped)
                 print(f"[PayUni _aes_decrypt] Hex 解碼成功，長度={len(raw_bytes)}")
             except Exception as e:
-                print(f"[PayUni _aes_decrypt] Hex 解碼失敗: {e}，fallback Base64")
-                raw_bytes = base64.b64decode(stripped)
+                print(f"[PayUni _aes_decrypt] Hex 解碼失敗: {e}，fallback URLSafe Base64")
+                raw_bytes = base64.urlsafe_b64decode(stripped + "==")
         else:
-            # Base64 模式：直接 Base64 解碼
             try:
-                raw_bytes = base64.b64decode(stripped)
-                print(f"[PayUni _aes_decrypt] Base64 解碼成功，長度={len(raw_bytes)}")
+                # 補齊 padding 再解碼
+                raw_bytes = base64.urlsafe_b64decode(stripped + "==")
+                print(f"[PayUni _aes_decrypt] URLSafe Base64 解碼成功，長度={len(raw_bytes)}")
             except Exception as e:
-                print(f"[PayUni _aes_decrypt] Base64 解碼失敗: {e}，fallback Hex")
+                print(f"[PayUni _aes_decrypt] URLSafe Base64 解碼失敗: {e}，fallback Hex")
                 raw_bytes = binascii.unhexlify(stripped)
 
-        # 長度檢查：非 16 倍數代表是 PayUni 固定錯誤訊息，無法解密
         if len(raw_bytes) % 16 != 0:
             try:
                 raw_msg = raw_bytes.decode("utf-8", errors="ignore")
