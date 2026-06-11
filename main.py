@@ -12,10 +12,18 @@ from linebot.v3.webhooks import (
 from linebot.v3.exceptions import InvalidSignatureError
 from groq import Groq
 from supabase import create_client
-from payuni import create_payment as ecpay_create, verify_notify, is_payment_success, get_order_id_from_notify
+from payuni import (
+    create_payment as ecpay_create,
+    verify_notify,
+    is_payment_success,
+    get_notify_data,
+    get_return_data,
+    get_order_id_from_notify
+)
 import os, random, datetime, pytz, threading, uuid, time
 import requests
 from apscheduler.schedulers.background import BackgroundScheduler
+
 
 app = Flask(__name__)
 
@@ -429,9 +437,10 @@ def mark_service_used(service_id):
 
 def increment_follow_up(service_id):
     result = supabase.table("services").select("follow_up_count").eq("service_id", service_id).execute()
-    current = result.data[0].get("follow_up_count") or 0 if result.data else 0
+    current = (result.data[0].get("follow_up_count") or 0) if result.data else 0
     supabase.table("services").update({"follow_up_count": current + 1}).eq("service_id", service_id).execute()
     return current + 1
+
 
 
 # ══════════════════════════════════════════
@@ -2453,59 +2462,124 @@ def ecpay_notify():
     try:
         form_data = request.form.to_dict()
         print(f"[PayUni notify] 收到原始資料: {form_data}")
+
         if not verify_notify(form_data):
             print(f"[PayUni notify] 驗簽失敗：{form_data}")
             return "failure", 200
-        from payuni import get_notify_data
+
         notify_data = get_notify_data(form_data)
         print(f"[PayUni notify] 解密後資料: {notify_data}")
+
         if is_payment_success(notify_data):
             order_id = notify_data.get("MerTradeNo", "")
             print(f"[PayUni notify] 付款成功，order_id={order_id}")
-            _activate_payment(order_id)
+
+            if order_id:
+                _activate_payment(order_id)
+            else:
+                print("[PayUni notify] 付款成功但 MerTradeNo 為空")
+
+        else:
+            print(f"[PayUni notify] 非付款成功狀態：{notify_data}")
+
         return "success", 200
+
     except Exception as e:
         print(f"[payuni_notify 錯誤] {e}")
         return "failure", 200
 
 
+
 @app.route("/pay/confirm", methods=["GET", "POST"])
 def ecpay_confirm():
     try:
-        print(f"[pay/confirm] method={request.method}, form={request.form.to_dict()}, args={request.args.to_dict()}")
+        print(
+            f"[pay/confirm] method={request.method}, "
+            f"form={request.form.to_dict()}, "
+            f"args={request.args.to_dict()}"
+        )
 
         if request.method == "POST":
             form_data = request.form.to_dict()
-            from payuni import get_return_data
-            notify_data = get_return_data(form_data)
-            status   = notify_data.get("Status", "")
-            order_id = notify_data.get("MerTradeNo", "")
+            return_data = get_return_data(form_data)
+
+            status = return_data.get("Status", "")
+            order_id = return_data.get("MerTradeNo", "")
+
         else:
-            status   = request.args.get("Status", "")
+            status = request.args.get("Status", "")
             order_id = request.args.get("MerTradeNo", "")
 
+            return_data = {
+                "Status": status,
+                "MerTradeNo": order_id,
+                **request.args.to_dict()
+            }
+
+        print(f"[pay/confirm] return_data={return_data}")
         print(f"[pay/confirm] status={status}, order_id={order_id}")
 
         if status == "SUCCESS" and order_id:
             _activate_payment(order_id)
+
             return """<html>
-            <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-            <title>付款成功</title>
-            <style>body{font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;}h2{color:#6B4FA0;}p{color:#555;}</style>
-            </head><body>
-            <h2>✅ 付款成功！</h2><p>感謝您的購買 🌟</p>
-            <p>請返回 LINE 查看最新狀態</p>
-            <p style="color:#aaa;font-size:0.85em;margin-top:32px;">老師已準備好，隨時為您指引星途 🔮</p>
-            </body></html>""", 200
-        else:
-            return """<html>
-            <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+            <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width,initial-scale=1">
+                <title>付款成功</title>
+                <style>
+                    body {
+                        font-family: sans-serif;
+                        text-align: center;
+                        padding: 50px;
+                        background: #F8F4FF;
+                    }
+                    h2 { color: #6B4FA0; }
+                    p { color: #555; }
+                </style>
+            </head>
+            <body>
+                <h2>✅ 付款成功！</h2>
+                <p>感謝您的購買 🌟</p>
+                <p>請返回 LINE 查看最新狀態</p>
+                <p style="color:#aaa;font-size:0.85em;margin-top:32px;">
+                    老師已準備好，隨時為您指引星途 🔮
+                </p>
+            </body>
+            </html>""", 200
+
+        error_code = status or "UNKNOWN"
+        print(f"[pay/confirm] 付款未完成，錯誤代碼={error_code}")
+
+        return f"""<html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width,initial-scale=1">
             <title>付款未完成</title>
-            <style>body{font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;}h2{color:#cc4444;}p{color:#555;}</style>
-            </head><body>
-            <h2>❌ 付款未完成</h2><p>請返回 LINE 重新操作</p>
+            <style>
+                body {{
+                    font-family: sans-serif;
+                    text-align: center;
+                    padding: 50px;
+                    background: #F8F4FF;
+                }}
+                h2 {{ color: #cc4444; }}
+                p {{ color: #555; }}
+                .code {{
+                    margin-top: 20px;
+                    color: #aaa;
+                    font-size: 0.85em;
+                }}
+            </style>
+        </head>
+        <body>
+            <h2>❌ 付款未完成</h2>
+            <p>請返回 LINE 重新操作</p>
+            <p class="code">錯誤代碼：{error_code}</p>
             <p style="color:#aaa;font-size:0.85em;">若有疑問請聯繫客服 🙏</p>
-            </body></html>""", 200
+        </body>
+        </html>""", 200
+
     except Exception as e:
         print(f"[ecpay_confirm 錯誤] {e}")
         return "伺服器錯誤", 500
