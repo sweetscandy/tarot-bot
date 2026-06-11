@@ -66,6 +66,56 @@ def _check_config():
 # AES-GCM 加密 / 解密
 # ══════════════════════════════════════════
 
+def _aes_encrypt(data: dict) -> str:
+    """
+    PAYUNi EncryptInfo 加密。
+
+    對應 PHP 範例：
+
+    $encrypted = openssl_encrypt(
+        http_build_query($data),
+        "aes-256-gcm",
+        trim($merKey),
+        0,
+        trim($merIV),
+        $tag
+    );
+
+    return trim(bin2hex($encrypted . ":::" . base64_encode($tag)));
+
+    注意：
+    PHP openssl_encrypt options=0 時，$encrypted 是 Base64 字串，
+    不是 raw binary ciphertext。
+    """
+    _check_config()
+
+    # 對應 PHP http_build_query($data)
+    plain = urllib.parse.urlencode(data)
+
+    print(f"[PayUni _aes_encrypt] 明文(http_build_query): {plain}")
+
+    key = PAYUNI_HASH_KEY.strip().encode("utf-8")
+    iv = PAYUNI_HASH_IV.strip().encode("utf-8")
+
+    cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
+    encrypted_raw, tag = cipher.encrypt_and_digest(plain.encode("utf-8"))
+
+    # ✅ 模擬 PHP openssl_encrypt options=0 的回傳：
+    # PHP 會回傳 base64 字串，所以這裡也要先 base64 encode ciphertext
+    encrypted_b64 = base64.b64encode(encrypted_raw)
+    tag_b64 = base64.b64encode(tag)
+
+    payload = encrypted_b64 + b":::" + tag_b64
+    encrypt_info = payload.hex()
+
+    print(f"[PayUni _aes_encrypt] GCM encrypted raw length={len(encrypted_raw)}")
+    print(f"[PayUni _aes_encrypt] encrypted_b64={encrypted_b64.decode('utf-8')[:80]}...")
+    print(f"[PayUni _aes_encrypt] tag_b64={tag_b64.decode('utf-8')}")
+    print(f"[PayUni _aes_encrypt] Hex EncryptInfo: {encrypt_info[:80]}...")
+
+    return encrypt_info
+
+
 def _aes_decrypt(encrypt_info: str) -> dict:
     """
     PAYUNi EncryptInfo 解密。
@@ -111,75 +161,15 @@ def _aes_decrypt(encrypt_info: str) -> dict:
         encrypted_raw = base64.b64decode(encrypt_data_b64)
         tag = base64.b64decode(tag_b64)
 
-        print(f"[PayUni _aes_decrypt] encrypt_data_b64={encrypt_data_b64.decode('utf-8', errors='ignore')[:80]}...")
+        print(
+            f"[PayUni _aes_decrypt] "
+            f"encrypt_data_b64={encrypt_data_b64.decode('utf-8', errors='ignore')[:80]}..."
+        )
         print(f"[PayUni _aes_decrypt] encrypted raw length={len(encrypted_raw)}")
         print(f"[PayUni _aes_decrypt] tag_b64={tag_b64.decode('utf-8', errors='ignore')}")
 
         cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
         raw = cipher.decrypt_and_verify(encrypted_raw, tag)
-
-        decoded = raw.decode("utf-8")
-
-        print(f"[PayUni _aes_decrypt] 解密明文: {decoded}")
-
-        result = {}
-        for k, v in urllib.parse.parse_qsl(decoded, keep_blank_values=True):
-            result[k] = v
-
-        print(f"[PayUni _aes_decrypt] 解密成功: {result}")
-
-        return result
-
-    except Exception as e:
-        print(f"[PayUni _aes_decrypt] 解密失敗: {e}")
-        return {}
-
-
-
-def _aes_decrypt(encrypt_info: str) -> dict:
-    """
-    PAYUNi EncryptInfo 解密。
-
-    對應 PHP 範例：
-
-    list($encryptData, $tag) = explode(":::", hex2bin($encryptStr), 2);
-
-    openssl_decrypt(
-        $encryptData,
-        "aes-256-gcm",
-        trim($merKey),
-        0,
-        trim($merIV),
-        base64_decode($tag)
-    );
-    """
-    try:
-        _check_config()
-
-        if not encrypt_info:
-            print("[PayUni _aes_decrypt] EncryptInfo 為空")
-            return {}
-
-        key = PAYUNI_HASH_KEY.strip().encode("utf-8")
-        iv = PAYUNI_HASH_IV.strip().encode("utf-8")
-
-        payload = bytes.fromhex(encrypt_info.strip())
-
-        print(f"[PayUni _aes_decrypt] Hex 解碼成功，payload length={len(payload)}")
-
-        if b":::" not in payload:
-            print("[PayUni _aes_decrypt] payload 缺少 ::: 分隔符")
-            print(f"[PayUni _aes_decrypt] payload raw preview={payload[:100]}")
-            return {}
-
-        encrypt_data, tag_b64 = payload.split(b":::", 1)
-        tag = base64.b64decode(tag_b64)
-
-        print(f"[PayUni _aes_decrypt] GCM encrypted length={len(encrypt_data)}")
-        print(f"[PayUni _aes_decrypt] GCM tag_b64={tag_b64.decode('utf-8', errors='ignore')}")
-
-        cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
-        raw = cipher.decrypt_and_verify(encrypt_data, tag)
 
         decoded = raw.decode("utf-8")
 
@@ -233,6 +223,7 @@ def create_payment(user_id: str, amount: int, order_id: str,
     - MerTradeNo 直接使用 order_id
     - PAYUNi 回傳時，MerTradeNo 就能直接對應 Supabase orders/payments 的 order_id
     - EncryptInfo 使用 AES-256-GCM
+    - EncryptInfo 格式為 hex(base64(ciphertext) + ":::" + base64(tag))
     - HashInfo 使用 SHA256(HashKey + EncryptInfo + HashIV)
     """
     _check_config()
