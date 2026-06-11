@@ -2,10 +2,9 @@ import hashlib
 import os
 import time
 import urllib.parse
-import binascii
+import base64
 
 from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad, unpad
 
 
 # ══════════════════════════════════════════
@@ -28,12 +27,18 @@ PAYUNI_API_URL = "https://api.payuni.com.tw/api/upp"
 # PAYUNI_API_URL = "https://sandbox-api.payuni.com.tw/api/upp"
 
 
-print(f"[PayUni 初始化] MerchantID={PAYUNI_MERCHANT_ID}, AES_TYPE=hex, API={PAYUNI_API_URL}")
+print(
+    f"[PayUni 初始化] "
+    f"MerchantID={PAYUNI_MERCHANT_ID}, AES_MODE=AES-256-GCM, API={PAYUNI_API_URL}"
+)
 
 
 def _check_config():
     """
     檢查必要環境變數是否存在。
+    PAYUNi AES-256-GCM 規格：
+    - HashKey / AesKey 通常為 32 bytes
+    - HashIV / AesIV 通常為 16 bytes
     """
     missing = []
 
@@ -47,33 +52,56 @@ def _check_config():
     if missing:
         raise RuntimeError(f"PAYUNi 環境變數缺少：{', '.join(missing)}")
 
+    key_len = len(PAYUNI_HASH_KEY.strip().encode("utf-8"))
+    iv_len = len(PAYUNI_HASH_IV.strip().encode("utf-8"))
+
+    if key_len != 32:
+        raise RuntimeError(f"PAYUNi HashKey 長度錯誤：目前 {key_len} bytes，應為 32 bytes")
+
+    if iv_len != 16:
+        raise RuntimeError(f"PAYUNi HashIV 長度錯誤：目前 {iv_len} bytes，應為 16 bytes")
+
 
 # ══════════════════════════════════════════
-# AES 加密 / 解密
+# AES-GCM 加密 / 解密
 # ══════════════════════════════════════════
 
 def _aes_encrypt(data: dict) -> str:
     """
     PAYUNi EncryptInfo 加密。
-    使用 AES-256-CBC + PKCS7 Padding，輸出 hex 字串。
+
+    對應 PHP 範例：
+
+    openssl_encrypt(
+        http_build_query($data),
+        "aes-256-gcm",
+        trim($merKey),
+        0,
+        trim($merIV),
+        $tag
+    );
+
+    return bin2hex($encrypted . ":::" . base64_encode($tag));
     """
     _check_config()
 
-    plain = "&".join(
-        f"{k}={urllib.parse.quote(str(v), safe='')}"
-        for k, v in data.items()
-    )
+    # 對應 PHP http_build_query($data)
+    # urllib.parse.urlencode 預設 quote_plus，空白會變 +，較接近 PHP http_build_query
+    plain = urllib.parse.urlencode(data)
 
-    print(f"[PayUni _aes_encrypt] 明文(encoded): {plain}")
+    print(f"[PayUni _aes_encrypt] 明文(http_build_query): {plain}")
 
-    key = PAYUNI_HASH_KEY.encode("utf-8")
-    iv = PAYUNI_HASH_IV.encode("utf-8")
+    key = PAYUNI_HASH_KEY.strip().encode("utf-8")
+    iv = PAYUNI_HASH_IV.strip().encode("utf-8")
 
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    encrypted = cipher.encrypt(pad(plain.encode("utf-8"), AES.block_size))
+    cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
+    encrypted, tag = cipher.encrypt_and_digest(plain.encode("utf-8"))
 
-    encrypt_info = encrypted.hex()
+    payload = encrypted + b":::" + base64.b64encode(tag)
+    encrypt_info = payload.hex()
 
+    print(f"[PayUni _aes_encrypt] GCM encrypted length={len(encrypted)}")
+    print(f"[PayUni _aes_encrypt] GCM tag={base64.b64encode(tag).decode('utf-8')}")
     print(f"[PayUni _aes_encrypt] Hex EncryptInfo: {encrypt_info[:80]}...")
 
     return encrypt_info
@@ -82,7 +110,19 @@ def _aes_encrypt(data: dict) -> str:
 def _aes_decrypt(encrypt_info: str) -> dict:
     """
     PAYUNi EncryptInfo 解密。
-    PAYUNi 回傳通常為 hex 字串，因此固定用 hex 解密。
+
+    對應 PHP 範例：
+
+    list($encryptData, $tag) = explode(":::", hex2bin($encryptStr), 2);
+
+    openssl_decrypt(
+        $encryptData,
+        "aes-256-gcm",
+        trim($merKey),
+        0,
+        trim($merIV),
+        base64_decode($tag)
+    );
     """
     try:
         _check_config()
@@ -91,32 +131,34 @@ def _aes_decrypt(encrypt_info: str) -> dict:
             print("[PayUni _aes_decrypt] EncryptInfo 為空")
             return {}
 
-        stripped = encrypt_info.strip()
+        key = PAYUNI_HASH_KEY.strip().encode("utf-8")
+        iv = PAYUNI_HASH_IV.strip().encode("utf-8")
 
-        key = PAYUNI_HASH_KEY.encode("utf-8")
-        iv = PAYUNI_HASH_IV.encode("utf-8")
+        payload = bytes.fromhex(encrypt_info.strip())
 
-        raw_bytes = binascii.unhexlify(stripped)
+        print(f"[PayUni _aes_decrypt] Hex 解碼成功，payload length={len(payload)}")
 
-        print(f"[PayUni _aes_decrypt] Hex 解碼成功，長度={len(raw_bytes)}")
-
-        if len(raw_bytes) % 16 != 0:
-            print(f"[PayUni _aes_decrypt] 長度 {len(raw_bytes)} 非 16 的倍數，無法解密")
+        if b":::" not in payload:
+            print("[PayUni _aes_decrypt] payload 缺少 ::: 分隔符")
+            print(f"[PayUni _aes_decrypt] payload raw preview={payload[:100]}")
             return {}
 
-        cipher = AES.new(key, AES.MODE_CBC, iv)
-        raw = unpad(cipher.decrypt(raw_bytes), AES.block_size)
+        encrypt_data, tag_b64 = payload.split(b":::", 1)
+        tag = base64.b64decode(tag_b64)
+
+        print(f"[PayUni _aes_decrypt] GCM encrypted length={len(encrypt_data)}")
+        print(f"[PayUni _aes_decrypt] GCM tag_b64={tag_b64.decode('utf-8', errors='ignore')}")
+
+        cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
+        raw = cipher.decrypt_and_verify(encrypt_data, tag)
 
         decoded = raw.decode("utf-8")
 
         print(f"[PayUni _aes_decrypt] 解密明文: {decoded}")
 
         result = {}
-
-        for part in decoded.split("&"):
-            if "=" in part:
-                k, v = part.split("=", 1)
-                result[k] = urllib.parse.unquote(v)
+        for k, v in urllib.parse.parse_qsl(decoded, keep_blank_values=True):
+            result[k] = v
 
         print(f"[PayUni _aes_decrypt] 解密成功: {result}")
 
@@ -134,13 +176,17 @@ def _aes_decrypt(encrypt_info: str) -> dict:
 def _generate_hash_info(encrypt_info: str) -> str:
     """
     產生 PAYUNi HashInfo。
-    格式：
-    HashKey=xxx&EncryptInfo=xxx&HashIV=xxx
+
+    對應 PHP 範例：
+
+    strtoupper(hash("sha256", "$merKey$encryptStr$merIV"));
     """
     _check_config()
 
-    raw = f"HashKey={PAYUNI_HASH_KEY}&EncryptInfo={encrypt_info}&HashIV={PAYUNI_HASH_IV}"
+    raw = f"{PAYUNI_HASH_KEY.strip()}{encrypt_info}{PAYUNI_HASH_IV.strip()}"
     hash_info = hashlib.sha256(raw.encode("utf-8")).hexdigest().upper()
+
+    print(f"[PayUni _generate_hash_info] HashInfo={hash_info}")
 
     return hash_info
 
@@ -156,7 +202,9 @@ def create_payment(user_id: str, amount: int, order_id: str,
 
     重點：
     - MerTradeNo 直接使用 order_id
-    - 這樣 PAYUNi 回傳時，MerTradeNo 就能直接對應 Supabase orders/payments 的 order_id
+    - PAYUNi 回傳時，MerTradeNo 就能直接對應 Supabase orders/payments 的 order_id
+    - EncryptInfo 使用 AES-256-GCM
+    - HashInfo 使用 SHA256(HashKey + EncryptInfo + HashIV)
     """
     _check_config()
 
@@ -172,8 +220,8 @@ def create_payment(user_id: str, amount: int, order_id: str,
         .strip()
     )[:50]
 
-    # ✅ 關鍵修正：直接使用系統 order_id
-    # PAYUNi 限制 MerTradeNo 長度 25，格式 [A-Za-z0-9_-]
+    # 直接使用系統 order_id
+    # PAYUNi 常見限制：MerTradeNo 長度 25 以內，格式 [A-Za-z0-9_-]
     # 你的 order_id 是 uuid 前 20 碼，符合規格
     mer_trade_no = order_id
 
@@ -299,7 +347,7 @@ def create_payment(user_id: str, amount: int, order_id: str,
 
     <form method="POST" action="{PAYUNI_API_URL}">
       <input type="hidden" name="MerID" value="{PAYUNI_MERCHANT_ID}">
-      <input type="hidden" name="Version" value="2.0">
+      <input type="hidden" name="Version" value="1.0">
       <input type="hidden" name="EncryptInfo" value="{encrypt_info}">
       <input type="hidden" name="HashInfo" value="{hash_info}">
 
