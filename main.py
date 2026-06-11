@@ -177,7 +177,6 @@ FORTUNE_STICK_POEMS = [
 ]
 FORTUNE_STICKS = FORTUNE_STICK_POEMS
 
-
 SHICHEN_LIST = [
     "子時（23:00–01:00）", "丑時（01:00–03:00）",
     "寅時（03:00–05:00）", "卯時（05:00–07:00）",
@@ -206,6 +205,43 @@ SYSTEM_PROMPT = """你是「口袋裡的心靈星運導航」，一位溫柔神�
 - 「這個問題超出了老師的水晶球範圍呢 🔮 有感情、工作或人生方向的困惑嗎？」"""
 
 pending_state = {}
+
+# ══════════════════════════════════════════
+#  追問逾時自動結束機制
+# ══════════════════════════════════════════
+follow_up_timers = {}  # {line_user_id: threading.Timer}
+
+def _cancel_follow_up_timer(line_user_id):
+    """取消現有的追問計時器"""
+    if line_user_id in follow_up_timers:
+        follow_up_timers[line_user_id].cancel()
+        del follow_up_timers[line_user_id]
+
+def _start_follow_up_timer(line_user_id, service_id, service_type, label):
+    """啟動 15 分鐘追問逾時計時器"""
+    _cancel_follow_up_timer(line_user_id)
+
+    def _on_timeout():
+        pending_state.pop(line_user_id, None)
+        follow_up_timers.pop(line_user_id, None)
+        try:
+            supabase.table("services").update({
+                "status": "completed"
+            }).eq("service_id", service_id).execute()
+        except Exception as e:
+            print(f"[逾時結束] 更新服務狀態失敗: {e}")
+        push_text(
+            line_user_id,
+            f"🌙 {label} 服務已自動結束\n\n"
+            f"超過 15 分鐘未追問，老師已為您關閉本次服務 ✨\n\n"
+            f"若有新的問題，歡迎隨時再次購買服務 💎"
+        )
+
+    timer = threading.Timer(15 * 60, _on_timeout)
+    timer.daemon = True
+    timer.start()
+    follow_up_timers[line_user_id] = timer
+
 # ══════════════════════════════════════════
 #  工具函式
 # ══════════════════════════════════════════
@@ -440,7 +476,6 @@ def increment_follow_up(service_id):
     current = (result.data[0].get("follow_up_count") or 0) if result.data else 0
     supabase.table("services").update({"follow_up_count": current + 1}).eq("service_id", service_id).execute()
     return current + 1
-
 
 
 # ══════════════════════════════════════════
@@ -1093,7 +1128,7 @@ def _run_love_reading_background(line_user_id, situation, question_num, service_
 
 
 # ══════════════════════════════════════════
-#  職場運勢核心（背景執行）
+#  職場運勢核心（背景執行）★ 已修改：加入追問卡片
 # ══════════════════════════════════════════
 
 def _run_career_background(line_user_id, data, service_id):
@@ -1143,24 +1178,24 @@ def _run_career_background(line_user_id, data, service_id):
         if follow_up_num == 1:
             mark_service_used(service_id)
 
+        footer = get_lucky_item_text()
+        # ★ 先推送解析內容
+        push_text(line_user_id, f"💼 職場運勢解析\n\n{response_text}{footer}")
+
+        # ★ 再推送追問卡片或結束訊息
         if remaining > 0:
-            footer_hint = (
-                f"\n\n━━━━━━━━━━━━━━━\n"
-                f"💬 您還可以追問 {remaining} 次\n"
-                f"請直接輸入您的下一個職場問題 🌙"
-            )
+            push_flex(line_user_id, build_follow_up_flex("career", remaining, "💼 職場運勢"))
+            _start_follow_up_timer(line_user_id, service_id, "career", "💼 職場運勢")
         else:
-            footer_hint = (
-                f"\n\n━━━━━━━━━━━━━━━\n"
-                f"🌟 本次職場運勢解析已完成\n"
-                f"若有新的困惑，可重新購買服務 💎"
-            )
             supabase.table("services").update({
                 "status": "completed"
             }).eq("service_id", service_id).execute()
-
-        footer = get_lucky_item_text()
-        push_text(line_user_id, f"💼 職場運勢解析\n\n{response_text}{footer_hint}{footer}")
+            push_text(
+                line_user_id,
+                "🌟 本次職場運勢解析已完成\n\n"
+                "感謝您的信任，祝您職場順遂 💎\n\n"
+                "若有新的困惑，歡迎再次購買服務 🌙"
+            )
 
     except Exception as e:
         print(f"[職場運勢背景錯誤] {line_user_id}: {e}")
@@ -1168,7 +1203,7 @@ def _run_career_background(line_user_id, data, service_id):
 
 
 # ══════════════════════════════════════════
-#  財運分析核心（背景執行）
+#  財運分析核心（背景執行）★ 已修改：加入追問卡片
 # ══════════════════════════════════════════
 
 def _run_wealth_background(line_user_id, data, service_id):
@@ -1220,24 +1255,24 @@ def _run_wealth_background(line_user_id, data, service_id):
         if follow_up_num == 1:
             mark_service_used(service_id)
 
+        footer = get_lucky_item_text()
+        # ★ 先推送解析內容
+        push_text(line_user_id, f"💰 財運分析｜{hexagram}\n\n{response_text}{footer}")
+
+        # ★ 再推送追問卡片或結束訊息
         if remaining > 0:
-            footer_hint = (
-                f"\n\n━━━━━━━━━━━━━━━\n"
-                f"💬 您還可以追問 {remaining} 次\n"
-                f"請直接輸入您的下一個財運問題 🌙"
-            )
+            push_flex(line_user_id, build_follow_up_flex("wealth", remaining, "💰 財運分析"))
+            _start_follow_up_timer(line_user_id, service_id, "wealth", "💰 財運分析")
         else:
-            footer_hint = (
-                f"\n\n━━━━━━━━━━━━━━━\n"
-                f"🌟 本次財運分析已完成\n"
-                f"若有新的困惑，可重新購買服務 💎"
-            )
             supabase.table("services").update({
                 "status": "completed"
             }).eq("service_id", service_id).execute()
-
-        footer = get_lucky_item_text()
-        push_text(line_user_id, f"💰 財運分析｜{hexagram}\n\n{response_text}{footer_hint}{footer}")
+            push_text(
+                line_user_id,
+                "🌟 本次財運分析已完成\n\n"
+                "感謝您的信任，祝您財源廣進 💎\n\n"
+                "若有新的困惑，歡迎再次購買服務 🌙"
+            )
 
     except Exception as e:
         print(f"[財運分析背景錯誤] {line_user_id}: {e}")
@@ -1245,7 +1280,7 @@ def _run_wealth_background(line_user_id, data, service_id):
 
 
 # ══════════════════════════════════════════
-#  天書服務核心（背景執行）
+#  天書服務核心（背景執行）★ 已修改：加入追問卡片
 # ══════════════════════════════════════════
 
 def _run_double_chart_background(line_user_id, data, service_id):
@@ -1289,14 +1324,15 @@ def _run_double_chart_background(line_user_id, data, service_id):
         except Exception as e:
             print(f"tarot_logs 寫入錯誤: {e}")
 
-        limit = FOLLOW_UP_LIMITS.get("double_chart", 1)
-        follow_up_hint = (
-            f"\n\n━━━━━━━━━━━━━━━\n"
-            f"💬 您還可以追問 {limit} 次\n"
-            f"請直接輸入您想深入了解的問題 🌙"
-        )
         footer = get_lucky_item_text()
-        push_text(line_user_id, f"💑 雙人合盤解析\n\n{response_text}{follow_up_hint}{footer}")
+        limit = FOLLOW_UP_LIMITS.get("double_chart", 1)
+
+        # ★ 先推送解析內容
+        push_text(line_user_id, f"💑 雙人合盤解析\n\n{response_text}{footer}")
+
+        # ★ 再推送追問卡片 + 啟動計時器
+        push_flex(line_user_id, build_follow_up_flex("double_chart", limit, "💑 雙人合盤"))
+        _start_follow_up_timer(line_user_id, service_id, "double_chart", "💑 雙人合盤")
 
     except Exception as e:
         print(f"[雙人合盤背景錯誤] {line_user_id}: {e}")
@@ -1346,14 +1382,15 @@ def _run_year_fortune_background(line_user_id, data, service_id):
         except Exception as e:
             print(f"tarot_logs 寫入錯誤: {e}")
 
-        limit = FOLLOW_UP_LIMITS.get("year_fortune", 1)
-        follow_up_hint = (
-            f"\n\n━━━━━━━━━━━━━━━\n"
-            f"💬 您還可以追問 {limit} 次\n"
-            f"請直接輸入您想深入了解的問題 🌙"
-        )
         footer = get_lucky_item_text()
-        push_text(line_user_id, f"📅 {current_year} 流年運勢報告\n\n{response_text}{follow_up_hint}{footer}")
+        limit = FOLLOW_UP_LIMITS.get("year_fortune", 1)
+
+        # ★ 先推送解析內容
+        push_text(line_user_id, f"📅 {current_year} 流年運勢報告\n\n{response_text}{footer}")
+
+        # ★ 再推送追問卡片 + 啟動計時器
+        push_flex(line_user_id, build_follow_up_flex("year_fortune", limit, "📅 流年運勢"))
+        _start_follow_up_timer(line_user_id, service_id, "year_fortune", "📅 流年運勢")
 
     except Exception as e:
         print(f"[流年運勢背景錯誤] {line_user_id}: {e}")
@@ -1403,14 +1440,15 @@ def _run_ziwei_background(line_user_id, data, service_id):
         except Exception as e:
             print(f"tarot_logs 寫入錯誤: {e}")
 
-        limit = FOLLOW_UP_LIMITS.get("ziwei", 2)
-        follow_up_hint = (
-            f"\n\n━━━━━━━━━━━━━━━\n"
-            f"💬 您還可以追問 {limit} 次\n"
-            f"請直接輸入您想深入了解的問題 🌙"
-        )
         footer = get_lucky_item_text()
-        push_text(line_user_id, f"⭐ 紫微斗數命盤解析\n\n{response_text}{follow_up_hint}{footer}")
+        limit = FOLLOW_UP_LIMITS.get("ziwei", 2)
+
+        # ★ 先推送解析內容
+        push_text(line_user_id, f"⭐ 紫微斗數命盤解析\n\n{response_text}{footer}")
+
+        # ★ 再推送追問卡片 + 啟動計時器
+        push_flex(line_user_id, build_follow_up_flex("ziwei", limit, "⭐ 紫微斗數"))
+        _start_follow_up_timer(line_user_id, service_id, "ziwei", "⭐ 紫微斗數")
 
     except Exception as e:
         print(f"[紫微斗數背景錯誤] {line_user_id}: {e}")
@@ -1418,7 +1456,7 @@ def _run_ziwei_background(line_user_id, data, service_id):
 
 
 # ══════════════════════════════════════════
-#  追問處理（天書服務共用）
+#  追問處理（天書服務共用）★ 已修改：加入追問卡片
 # ══════════════════════════════════════════
 
 def _run_follow_up_background(line_user_id, service_type, question, service_id, follow_up_num):
@@ -1429,6 +1467,8 @@ def _run_follow_up_background(line_user_id, service_type, question, service_id, 
             "double_chart": "💑 雙人合盤",
             "year_fortune":  "📅 流年運勢",
             "ziwei":         "⭐ 紫微斗數",
+            "career":        "💼 職場運勢",
+            "wealth":        "💰 財運分析",
         }
         label = service_labels.get(service_type, "占卜")
 
@@ -1462,20 +1502,27 @@ def _run_follow_up_background(line_user_id, service_type, question, service_id, 
         except Exception as e:
             print(f"[追問 tarot_logs 寫入錯誤] {e}")
 
-        if remaining > 0:
-            footer_hint = (
-                f"\n\n━━━━━━━━━━━━━━━\n"
-                f"💬 您還可以追問 {remaining} 次\n"
-                f"請直接輸入您的問題 🌙"
-            )
-        else:
-            footer_hint = (
-                f"\n\n━━━━━━━━━━━━━━━\n"
-                f"🌟 本次服務追問次數已用完\n"
-                f"感謝您的信任，祝您一切順心 💎"
-            )
+        # ★ 先推送追問解讀內容
+        push_text(line_user_id, f"{label}｜追問解讀\n\n{response_text}")
 
-        push_text(line_user_id, f"{label}｜追問解讀\n\n{response_text}{footer_hint}")
+        # ★ 再判斷是否還有追問次數
+        if remaining > 0:
+            push_flex(line_user_id, build_follow_up_flex(service_type, remaining, label))
+            _start_follow_up_timer(line_user_id, service_id, service_type, label)
+        else:
+            # 追問次數用完，標記服務完成
+            try:
+                supabase.table("services").update({
+                    "status": "completed"
+                }).eq("service_id", service_id).execute()
+            except Exception as e:
+                print(f"[追問完成] 更新服務狀態失敗: {e}")
+            push_text(
+                line_user_id,
+                f"🌟 本次 {label} 服務追問次數已全部使用完畢\n\n"
+                f"感謝您的信任，祝您一切順心 💎\n\n"
+                f"若有新的困惑，歡迎再次購買服務 🌙"
+            )
 
     except Exception as e:
         print(f"[追問背景錯誤] {line_user_id}: {e}")
@@ -1576,13 +1623,73 @@ def do_daily_push():
 #  Flex Message 工廠
 # ══════════════════════════════════════════
 
-# ★ 新增：生辰確認卡片（取代文字「確認／重填」）
+# ★ 新增：追問卡片
+def build_follow_up_flex(service_type, remaining, label):
+    """
+    解析完成後推送的追問卡片
+    service_type : "ziwei" / "double_chart" / "year_fortune" / "career" / "wealth"
+    remaining    : 剩餘追問次數
+    label        : 顯示名稱，如 "⭐ 紫微斗數"
+    """
+    flex_content = {
+        "type": "bubble",
+        "styles": {
+            "header": {"backgroundColor": "#2D1B69"},
+            "body":   {"backgroundColor": "#F8F4FF"}
+        },
+        "header": {
+            "type": "box", "layout": "vertical",
+            "contents": [
+                {"type": "text", "text": f"{label}｜解析完成",
+                 "color": "#FFFFFF", "weight": "bold", "size": "lg"},
+                {"type": "text", "text": "老師已為您完成解讀 ✨",
+                 "color": "#C9B8FF", "size": "xs"}
+            ]
+        },
+        "body": {
+            "type": "box", "layout": "vertical", "spacing": "md",
+            "contents": [
+                {"type": "text",
+                 "text": f"💬 您還有 {remaining} 次追問機會",
+                 "color": "#6B4FA0", "weight": "bold", "size": "sm"},
+                {"type": "text",
+                 "text": "可以針對剛才的解析繼續深入提問\n或選擇結束本次服務",
+                 "color": "#888888", "size": "xs", "wrap": True},
+                {"type": "separator"},
+                {"type": "text",
+                 "text": "⏰ 若 15 分鐘內未追問，服務將自動結束",
+                 "color": "#AAAAAA", "size": "xs", "wrap": True}
+            ]
+        },
+        "footer": {
+            "type": "box", "layout": "vertical", "spacing": "sm",
+            "contents": [
+                {
+                    "type": "button", "style": "primary", "color": "#6B4FA0",
+                    "action": {
+                        "type": "postback",
+                        "label": f"💬 我要追問（剩 {remaining} 次）",
+                        "data": f"follow_up_{service_type}"
+                    }
+                },
+                {
+                    "type": "button", "style": "secondary",
+                    "action": {
+                        "type": "postback",
+                        "label": "✅ 結束服務，謝謝老師",
+                        "data": f"end_service_{service_type}"
+                    }
+                }
+            ]
+        }
+    }
+    return FlexMessage(
+        alt_text=f"{label} 解析完成，還有 {remaining} 次追問機會",
+        contents=FlexContainer.from_dict(flex_content)
+    )
+
+
 def build_confirm_birth_flex(birth_date, label="您的生辰", next_step_hint="確認後繼續"):
-    """
-    birth_date : 已解析的日期字串，如 "1990-05-20"
-    label      : 顯示標題，如 "甲方生辰" / "乙方生辰" / "您的生辰"
-    next_step_hint : 確認後的提示文字
-    """
     zodiac = get_zodiac(birth_date) or "未知"
     flex_content = {
         "type": "bubble",
@@ -1923,7 +2030,7 @@ def build_divination_service_flex():
                 {"type": "text", "text": "感情、工作、人生卡關？讓星盤深度為你指引方向", "color": "#888888", "size": "xs", "wrap": True},
                 {"type": "separator"},
                 {"type": "text", "text": "🎋 求籤問卜　1 顆代幣", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
-                {"type": "text", "text": "五大類別誠心問卜，老師 解籤為您指引方向", "color": "#888888", "size": "xs", "wrap": True},
+                {"type": "text", "text": "五大類別誠心問卜，老師解籤為您指引方向", "color": "#888888", "size": "xs", "wrap": True},
             ]
         },
         "footer": {
@@ -2912,7 +3019,11 @@ def handle_message(event):
                 current_tokens = fresh.data[0].get("tokens", 0) if fresh.data else 0
                 if current_tokens >= 1:
                     use_tokens(line_user_id, 1, "今日運勢（免費額度已用完）")
-                    wait_msg = random.choice(WAITING_MSGS_TAROT if reading_type == "tarot" else WAITING_MSGS_BAZI if reading_type == "bazi" else WAITING_MSGS_ICHING)
+                    wait_msg = random.choice(
+                        WAITING_MSGS_TAROT if reading_type == "tarot"
+                        else WAITING_MSGS_BAZI if reading_type == "bazi"
+                        else WAITING_MSGS_ICHING
+                    )
                     with ApiClient(configuration) as api_client:
                         MessagingApi(api_client).reply_message(ReplyMessageRequest(
                             reply_token=event.reply_token,
@@ -2927,7 +3038,11 @@ def handle_message(event):
                         ))
                 return
             pending_state.pop(line_user_id, None)
-            wait_msg = random.choice(WAITING_MSGS_TAROT if reading_type == "tarot" else WAITING_MSGS_BAZI if reading_type == "bazi" else WAITING_MSGS_ICHING)
+            wait_msg = random.choice(
+                WAITING_MSGS_TAROT if reading_type == "tarot"
+                else WAITING_MSGS_BAZI if reading_type == "bazi"
+                else WAITING_MSGS_ICHING
+            )
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest(
                     reply_token=event.reply_token,
@@ -2952,7 +3067,6 @@ def handle_message(event):
                 state["data"] = data
                 state["step"] = "birth1_confirm"
                 pending_state[line_user_id] = state
-                # ★ 改用 Flex 卡片
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(ReplyMessageRequest(
                         reply_token=event.reply_token,
@@ -2960,7 +3074,6 @@ def handle_message(event):
                     ))
                 return
             elif step == "birth1_confirm":
-                # 文字 fallback（Postback 已處理，這裡保留相容）
                 if user_msg in ["確認", "是", "對", "正確"]:
                     state["step"] = "birth2"
                     pending_state[line_user_id] = state
@@ -2991,7 +3104,6 @@ def handle_message(event):
                 state["data"] = data
                 state["step"] = "birth2_confirm"
                 pending_state[line_user_id] = state
-                # ★ 改用 Flex 卡片
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(ReplyMessageRequest(
                         reply_token=event.reply_token,
@@ -3037,7 +3149,6 @@ def handle_message(event):
                 state["data"] = data
                 state["step"] = "birth_confirm"
                 pending_state[line_user_id] = state
-                # ★ 改用 Flex 卡片
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(ReplyMessageRequest(
                         reply_token=event.reply_token,
@@ -3083,7 +3194,6 @@ def handle_message(event):
                 state["data"] = data
                 state["step"] = "birth_confirm"
                 pending_state[line_user_id] = state
-                # ★ 改用 Flex 卡片
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(ReplyMessageRequest(
                         reply_token=event.reply_token,
@@ -3107,6 +3217,13 @@ def handle_message(event):
                             reply_token=event.reply_token,
                             messages=[TextMessage(text="請重新輸入您的出生日期：\n\n📅 格式：1990-05-20")]
                         ))
+                return
+            elif step == "shichen":
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="請點選上方按鈕選擇您的出生時辰 🌙")]
+                    ))
                 return
 
         # ── 復合分析 ──
@@ -3155,7 +3272,6 @@ def handle_message(event):
                 state["data"] = data
                 state["step"] = "birth_confirm"
                 pending_state[line_user_id] = state
-                # ★ 改用 Flex 卡片
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(ReplyMessageRequest(
                         reply_token=event.reply_token,
@@ -3185,7 +3301,7 @@ def handle_message(event):
                 follow_up_num = state.get("follow_up_num", 1)
                 data["question"] = user_msg
                 data["follow_up_num"] = follow_up_num
-                limit = FOLLOW_UP_LIMITS.get("career", 2)
+                # ★ 清除 pending_state，讓背景函式的追問卡片接管
                 pending_state.pop(line_user_id, None)
                 wait_msg = random.choice(WAITING_MSGS_CAREER)
                 with ApiClient(configuration) as api_client:
@@ -3193,14 +3309,6 @@ def handle_message(event):
                         reply_token=event.reply_token,
                         messages=[TextMessage(text=wait_msg)]
                     ))
-                if follow_up_num < limit:
-                    pending_state[line_user_id] = {
-                        "mode": "career",
-                        "step": "question",
-                        "service_id": service_id,
-                        "follow_up_num": follow_up_num + 1,
-                        "data": {"birth": data.get("birth", "")}
-                    }
                 t = threading.Thread(
                     target=_run_career_background,
                     args=(line_user_id, data.copy(), service_id),
@@ -3209,12 +3317,14 @@ def handle_message(event):
                 t.start()
                 return
 
-        # ── 追問 ──
+        # ── 追問（天書服務共用）──
         elif mode == "follow_up":
             if step == "question":
                 service_type = state.get("service_type")
                 service_id   = state.get("service_id")
                 follow_up_num = state.get("follow_up_num", 1)
+                # ★ 取消計時器（用戶已回應）
+                _cancel_follow_up_timer(line_user_id)
                 pending_state.pop(line_user_id, None)
                 wait_msg = random.choice(WAITING_MSGS_TIANBOOK)
                 with ApiClient(configuration) as api_client:
@@ -3246,7 +3356,6 @@ def handle_message(event):
                 state["data"] = data
                 state["step"] = "birth_confirm"
                 pending_state[line_user_id] = state
-                # ★ 改用 Flex 卡片
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(ReplyMessageRequest(
                         reply_token=event.reply_token,
@@ -3276,7 +3385,7 @@ def handle_message(event):
                 follow_up_num = state.get("follow_up_num", 1)
                 data["question"] = user_msg
                 data["follow_up_num"] = follow_up_num
-                limit = FOLLOW_UP_LIMITS.get("wealth", 1)
+                # ★ 清除 pending_state，讓背景函式的追問卡片接管
                 pending_state.pop(line_user_id, None)
                 wait_msg = random.choice(WAITING_MSGS_WEALTH)
                 with ApiClient(configuration) as api_client:
@@ -3284,14 +3393,6 @@ def handle_message(event):
                         reply_token=event.reply_token,
                         messages=[TextMessage(text=wait_msg)]
                     ))
-                if follow_up_num < limit:
-                    pending_state[line_user_id] = {
-                        "mode": "wealth",
-                        "step": "question",
-                        "service_id": service_id,
-                        "follow_up_num": follow_up_num + 1,
-                        "data": {"birth": data.get("birth", "")}
-                    }
                 t = threading.Thread(
                     target=_run_wealth_background,
                     args=(line_user_id, data.copy(), service_id),
@@ -3876,7 +3977,7 @@ def handle_postback(event):
             ))
         return
 
-    # ★ 新增：生辰確認卡片的 Postback 處理
+    # ── 生辰確認卡片 Postback ──
     elif data.startswith("birth_confirm_yes_"):
         confirmed_date = data.replace("birth_confirm_yes_", "")
         if line_user_id not in pending_state:
@@ -3892,7 +3993,6 @@ def handle_postback(event):
         data_dict = state.get("data", {})
 
         if step == "birth1_confirm":
-            # 雙人合盤：甲方確認 → 進入乙方
             state["step"] = "birth2"
             pending_state[line_user_id] = state
             with ApiClient(configuration) as api_client:
@@ -3902,7 +4002,6 @@ def handle_postback(event):
                 ))
 
         elif step == "birth2_confirm":
-            # 雙人合盤：乙方確認 → 開始解析
             service_id = state.get("service_id")
             data_copy = data_dict.copy()
             pending_state.pop(line_user_id, None)
@@ -3967,7 +4066,6 @@ def handle_postback(event):
         state = pending_state[line_user_id]
         step  = state.get("step")
 
-        # 退回到對應的輸入步驟
         if step == "birth1_confirm":
             state["step"] = "birth1"
         elif step == "birth2_confirm":
@@ -4225,7 +4323,10 @@ def handle_postback(event):
             ))
         return
 
+    # ★ 追問按鈕：取消計時器 + 進入追問狀態
     elif data.startswith("follow_up_"):
+        # ★ 取消 15 分鐘逾時計時器
+        _cancel_follow_up_timer(line_user_id)
         service_type = data.replace("follow_up_", "")
         svc = get_active_service(line_user_id, service_type)
         if not svc:
@@ -4239,6 +4340,8 @@ def handle_postback(event):
             "double_chart": "💑 雙人合盤",
             "year_fortune":  "📅 流年運勢",
             "ziwei":         "⭐ 紫微斗數",
+            "career":        "💼 職場運勢",
+            "wealth":        "💰 財運分析",
         }
         label = service_labels.get(service_type, "占卜")
         pending_state[line_user_id] = {
@@ -4252,6 +4355,43 @@ def handle_postback(event):
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
                 reply_token=event.reply_token,
                 messages=[TextMessage(text=f"{label}｜追問\n\n請直接輸入您想深入了解的問題 🌙")]
+            ))
+        return
+
+    # ★ 結束服務按鈕
+    elif data.startswith("end_service_"):
+        service_type = data.replace("end_service_", "")
+        # 取消計時器
+        _cancel_follow_up_timer(line_user_id)
+        # 清除 pending_state
+        pending_state.pop(line_user_id, None)
+        # 標記服務完成
+        svc = get_active_service(line_user_id, service_type)
+        if svc:
+            try:
+                supabase.table("services").update({
+                    "status": "completed"
+                }).eq("service_id", svc["service_id"]).execute()
+            except Exception as e:
+                print(f"[end_service] 更新失敗: {e}")
+
+        service_labels = {
+            "double_chart": "💑 雙人合盤",
+            "year_fortune":  "📅 流年運勢",
+            "ziwei":         "⭐ 紫微斗數",
+            "career":        "💼 職場運勢",
+            "wealth":        "💰 財運分析",
+        }
+        label = service_labels.get(service_type, "占卜服務")
+        with ApiClient(configuration) as api_client:
+            MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                reply_token=event.reply_token,
+                messages=[TextMessage(text=(
+                    f"✅ {label} 服務已結束\n\n"
+                    f"感謝您今天與老師的深度交流 🌟\n"
+                    f"願星辰繼續守護您的每一步 💫\n\n"
+                    f"若有新的困惑，隨時回來找老師 🔮"
+                ))]
             ))
         return
 
@@ -4285,5 +4425,4 @@ scheduler.start()
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
 
