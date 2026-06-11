@@ -1792,19 +1792,19 @@ def handle_message(event):
                     state["step"] = "q4"
                     push_text(user_id, "📝 4/4：您對未來最美好的期望或願景是什麼？")
                     return
-                        elif q_step == "q4":
-                            state["data"]["q4"] = text
-                            push_text(user_id, random.choice(WAITING_MSGS_SPIRITUAL))
-                            
-                            zodiac = get_zodiac(state["data"]["birth"])
-                            t = threading.Thread(
-                                target=_run_spiritual_background,
-                                args=(user_id, state["data"], zodiac),
-                                daemon=True
-                            )
-                            t.start()
-                            pending_state.pop(user_id, None)
-                            return
+                elif q_step == "q4":
+                    state["data"]["q4"] = text
+                    push_text(user_id, random.choice(WAITING_MSGS_SPIRITUAL))
+                    
+                    zodiac = get_zodiac(state["data"]["birth"])
+                    t = threading.Thread(
+                        target=_run_spiritual_background,
+                        args=(user_id, state["data"], zodiac),
+                        daemon=True
+                    )
+                    t.start()
+                    pending_state.pop(user_id, None)
+                    return
 
             # 🔮 急救占卜文字輸入狀態機 (塔羅/八字/易經)
             elif mode.startswith("deep_reading_"):
@@ -1865,7 +1865,7 @@ def handle_message(event):
             )
             return
 
-        # 4. 處理購買單項服務指令 (觸發付款網址)
+        # 4. 處理購買單項服務指令
         elif text in ["購買double_chart", "購買雙人合盤"]:
             order_id = create_order(user_id, "double_chart", 1500)
             pay_url = f"{RENDER_URL}/pay/go/{order_id}"
@@ -1946,7 +1946,7 @@ def handle_message(event):
             push_flex(user_id, build_confirm_token_flex("deep", 2, user["tokens"]))
             return
 
-        # 7. 處理管理員指令 (補充代幣)
+        # 7. 處理管理員指令
         elif text.startswith("補充代幣") and user_id == ADMIN_USER_ID:
             parts = text.split()
             if len(parts) == 3:
@@ -1957,7 +1957,7 @@ def handle_message(event):
                 push_text(target_uid, f"🎁 老師為您手動補充了 {amount} 顆代幣！目前餘額：{new_bal} 顆 💎")
             return
 
-        # 8. 處理追問 (若用戶有 active service 且輸入非指令文字，視為追問)
+        # 8. 處理追問
         for svc_type in ["double_chart", "year_fortune", "ziwei", "career", "wealth"]:
             svc = get_active_service(user_id, svc_type)
             if svc:
@@ -1985,7 +1985,7 @@ def handle_message(event):
                 t.start()
                 return
 
-        # 9. 預設兜底：如果是隨意閒聊，引導用戶進行免費占卜或代幣占卜
+        # 9. 預設兜底
         has_quota, quota_msg = check_free_reading_quota(user_id, user)
         if has_quota:
             push_text(user_id, 
@@ -2010,7 +2010,7 @@ def handle_postback(event):
         data = event.postback.data
         user = get_or_create_user(user_id)
 
-        # 1. 處理生日綁定 (DateTimePicker)
+        # 1. 處理生日綁定
         if data == "bind_birth":
             selected_date = event.postback.params.get("date")
             if not selected_date:
@@ -2082,7 +2082,7 @@ def handle_postback(event):
             push_text(user_id, "🆘 急救占卜啟動！\n\n請直接輸入您目前最卡關、最想問的問題：")
             return
 
-        # 6. 處理每日運勢類型選擇 (免費占卜)
+        # 6. 處理每日運勢類型選擇
         elif data in ["daily_tarot", "daily_bazi", "daily_iching"]:
             reading_type = data.split("_")[1]
             has_quota, quota_msg = check_free_reading_quota(user_id, user)
@@ -2140,13 +2140,13 @@ def handle_postback(event):
             t.start()
             return
 
-        # 9. 求籤問卜：選擇類別後顯示問題
+        # 9. 求籤問卜：選擇類別
         elif data.startswith("fortune_cat_"):
             category = data.split("_")[2]
             push_flex(user_id, build_fortune_stick_question_flex(category))
             return
 
-        # 10. 求籤問卜：選擇問題後顯示搖籤
+        # 10. 求籤問卜：選擇問題
         elif data.startswith("fortune_q_"):
             parts = data.split("_")
             category = parts[2]
@@ -2209,8 +2209,3 @@ scheduler.start()
 if __name__ == "__main__":
     # 本地測試使用，Render 部署時會由 Gunicorn 自動啟動 app
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
-
-
-
-
