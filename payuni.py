@@ -66,45 +66,74 @@ def _check_config():
 # AES-GCM 加密 / 解密
 # ══════════════════════════════════════════
 
-def _aes_encrypt(data: dict) -> str:
+def _aes_decrypt(encrypt_info: str) -> dict:
     """
-    PAYUNi EncryptInfo 加密。
+    PAYUNi EncryptInfo 解密。
 
     對應 PHP 範例：
 
-    openssl_encrypt(
-        http_build_query($data),
+    list($encryptData, $tag) = explode(":::", hex2bin($encryptStr), 2);
+
+    return openssl_decrypt(
+        $encryptData,
         "aes-256-gcm",
         trim($merKey),
         0,
         trim($merIV),
-        $tag
+        base64_decode($tag)
     );
 
-    return bin2hex($encrypted . ":::" . base64_encode($tag));
+    注意：
+    PHP openssl_decrypt options=0 時，$encryptData 是 Base64 字串。
+    因此 Python 這邊要先 base64 decode ciphertext。
     """
-    _check_config()
+    try:
+        _check_config()
 
-    # 對應 PHP http_build_query($data)
-    # urllib.parse.urlencode 預設 quote_plus，空白會變 +，較接近 PHP http_build_query
-    plain = urllib.parse.urlencode(data)
+        if not encrypt_info:
+            print("[PayUni _aes_decrypt] EncryptInfo 為空")
+            return {}
 
-    print(f"[PayUni _aes_encrypt] 明文(http_build_query): {plain}")
+        key = PAYUNI_HASH_KEY.strip().encode("utf-8")
+        iv = PAYUNI_HASH_IV.strip().encode("utf-8")
 
-    key = PAYUNI_HASH_KEY.strip().encode("utf-8")
-    iv = PAYUNI_HASH_IV.strip().encode("utf-8")
+        payload = bytes.fromhex(encrypt_info.strip())
 
-    cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
-    encrypted, tag = cipher.encrypt_and_digest(plain.encode("utf-8"))
+        print(f"[PayUni _aes_decrypt] Hex 解碼成功，payload length={len(payload)}")
 
-    payload = encrypted + b":::" + base64.b64encode(tag)
-    encrypt_info = payload.hex()
+        if b":::" not in payload:
+            print("[PayUni _aes_decrypt] payload 缺少 ::: 分隔符")
+            print(f"[PayUni _aes_decrypt] payload raw preview={payload[:100]}")
+            return {}
 
-    print(f"[PayUni _aes_encrypt] GCM encrypted length={len(encrypted)}")
-    print(f"[PayUni _aes_encrypt] GCM tag={base64.b64encode(tag).decode('utf-8')}")
-    print(f"[PayUni _aes_encrypt] Hex EncryptInfo: {encrypt_info[:80]}...")
+        encrypt_data_b64, tag_b64 = payload.split(b":::", 1)
 
-    return encrypt_info
+        encrypted_raw = base64.b64decode(encrypt_data_b64)
+        tag = base64.b64decode(tag_b64)
+
+        print(f"[PayUni _aes_decrypt] encrypt_data_b64={encrypt_data_b64.decode('utf-8', errors='ignore')[:80]}...")
+        print(f"[PayUni _aes_decrypt] encrypted raw length={len(encrypted_raw)}")
+        print(f"[PayUni _aes_decrypt] tag_b64={tag_b64.decode('utf-8', errors='ignore')}")
+
+        cipher = AES.new(key, AES.MODE_GCM, nonce=iv)
+        raw = cipher.decrypt_and_verify(encrypted_raw, tag)
+
+        decoded = raw.decode("utf-8")
+
+        print(f"[PayUni _aes_decrypt] 解密明文: {decoded}")
+
+        result = {}
+        for k, v in urllib.parse.parse_qsl(decoded, keep_blank_values=True):
+            result[k] = v
+
+        print(f"[PayUni _aes_decrypt] 解密成功: {result}")
+
+        return result
+
+    except Exception as e:
+        print(f"[PayUni _aes_decrypt] 解密失敗: {e}")
+        return {}
+
 
 
 def _aes_decrypt(encrypt_info: str) -> dict:
