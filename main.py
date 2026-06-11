@@ -896,9 +896,6 @@ def _run_weekly_fortune_background(line_user_id, reading_type, zodiac, user):
         except Exception as e:
             print(f"[一週運勢 tarot_logs 寫入錯誤] {e}")
 
-        if user:
-            increment_free_reading(line_user_id, user)
-
         footer = get_lucky_item_text()
         push_text(line_user_id, prefix + response_text + footer)
 
@@ -1294,7 +1291,6 @@ def _run_double_chart_background(line_user_id, data, service_id):
         push_text(line_user_id, f"💑 雙人合盤解析\n\n{response_text}{footer}")
 
         # ★ 再推送追問卡片 + 啟動計時器
-        push_text(line_user_id, f"💑 雙人合盤解析\n\n{response_text}{footer}")
         push_flex(line_user_id, build_follow_up_flex("double_chart", limit, "💑 雙人合盤"))
 
     except Exception as e:
@@ -1352,7 +1348,6 @@ def _run_year_fortune_background(line_user_id, data, service_id):
         push_text(line_user_id, f"📅 {current_year} 流年運勢報告\n\n{response_text}{footer}")
 
         # ★ 再推送追問卡片 + 啟動計時器
-        push_text(line_user_id, f"📅 {current_year} 流年運勢報告\n\n{response_text}{footer}")
         push_flex(line_user_id, build_follow_up_flex("year_fortune", limit, "📅 流年運勢"))
 
     except Exception as e:
@@ -1410,7 +1405,6 @@ def _run_ziwei_background(line_user_id, data, service_id):
         push_text(line_user_id, f"⭐ 紫微斗數命盤解析\n\n{response_text}{footer}")
 
         # ★ 再推送追問卡片 + 啟動計時器
-        push_text(line_user_id, f"⭐ 紫微斗數命盤解析\n\n{response_text}{footer}")
         push_flex(line_user_id, build_follow_up_flex("ziwei", limit, "⭐ 紫微斗數"))
 
     except Exception as e:
@@ -4317,8 +4311,6 @@ def handle_postback(event):
     # ★ 結束服務按鈕
     elif data.startswith("end_service_"):
         service_type = data.replace("end_service_", "")
-        # 取消計時器
-        _cancel_follow_up_timer(line_user_id)
         # 清除 pending_state
         pending_state.pop(line_user_id, None)
         # 標記服務完成
