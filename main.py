@@ -2304,38 +2304,25 @@ def push_now():
 
 @app.route("/pay/go/<order_id>", methods=["GET"])
 def ecpay_go(order_id):
-    import time
+    """GET：只顯示確認頁，不產生 PayUni 表單（防止 LINE 爬蟲觸發）"""
     try:
-        # ── 先查 payments 表（代幣包訂單）──
+        # ── 查 payments 表（代幣包）──
         result = supabase.table("payments").select("*").eq("order_id", order_id).execute()
         if result.data:
             payment = result.data[0]
             if payment.get("status") == "confirmed":
                 return "<html><body style='font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;'><h2>✅ 此訂單已完成付款</h2><p>請返回 LINE 查看詳情 🌟</p></body></html>", 200
-
             pkg_name = payment.get("package_type", "代幣包")
-            confirm_url = f"{RENDER_URL}/pay/confirm"
-            new_trade_no = order_id[:20] + str(int(time.time()))[-5:]
+            amount   = payment.get("amount", 0)
+            title    = f"星運導航・{pkg_name}"
+            return _render_confirm_page(order_id, title, amount)
 
-            html, mer_trade_no = ecpay_create(
-                user_id=payment["user_id"],
-                amount=payment["amount"],
-                order_id=new_trade_no,
-                product_name=f"星運導航-{pkg_name}",
-                confirm_url=confirm_url
-            )
-            supabase.table("payments").update({
-                "mer_trade_no": mer_trade_no
-            }).eq("order_id", order_id).execute()
-            return html
-
-        # ── 再查 orders 表（占卜服務訂單）──
+        # ── 查 orders 表（占卜服務）──
         result2 = supabase.table("orders").select("*").eq("order_id", order_id).execute()
         if result2.data:
             order = result2.data[0]
             if order.get("status") == "paid":
                 return "<html><body style='font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;'><h2>✅ 此訂單已完成付款</h2><p>請返回 LINE 查看詳情 🌟</p></body></html>", 200
-
             service_names = {
                 "double_chart": "雙人合盤解析",
                 "year_fortune": "流年運勢報告",
@@ -2345,13 +2332,111 @@ def ecpay_go(order_id):
                 "wealth":       "財運分析",
             }
             pkg_name = service_names.get(order["product_type"], order["product_type"])
-            confirm_url = f"{RENDER_URL}/pay/confirm"
-            new_trade_no = order_id[:20] + str(int(time.time()))[-5:]
+            amount   = order.get("amount", 0)
+            title    = f"星運導航・{pkg_name}"
+            return _render_confirm_page(order_id, title, amount)
 
+        return "<html><body style='font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;'><h2>❌ 找不到訂單</h2><p>請返回 LINE 重新操作 🙏</p></body></html>", 404
+
+    except Exception as e:
+        print(f"[pay/go GET] 錯誤: {e}")
+        return "<html><body style='font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;'><h2>❌ 系統錯誤</h2><p>請返回 LINE 重新操作 🙏</p></body></html>", 500
+
+
+def _render_confirm_page(order_id, title, amount):
+    """顯示確認頁，用戶點按鈕才 POST 產生表單"""
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>確認付款</title>
+  <style>
+    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body {{
+      font-family: -apple-system, sans-serif;
+      background: #F8F4FF;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 20px;
+    }}
+    .card {{
+      background: white; border-radius: 16px; padding: 40px 32px;
+      text-align: center; box-shadow: 0 4px 20px rgba(107,79,160,0.15);
+      max-width: 360px; width: 100%;
+    }}
+    .icon {{ font-size: 48px; margin-bottom: 16px; }}
+    h2 {{ color: #6B4FA0; font-size: 20px; margin-bottom: 8px; }}
+    .amount {{ font-size: 28px; font-weight: bold; color: #6B4FA0; margin: 16px 0; }}
+    .sub {{ color: #888; font-size: 14px; margin-bottom: 28px; }}
+    .btn {{
+      display: block; width: 100%; padding: 16px;
+      background: #6B4FA0; color: white; font-size: 17px;
+      font-weight: bold; border: none; border-radius: 12px;
+      cursor: pointer; letter-spacing: 1px;
+    }}
+    .btn:active {{ background: #4A3080; }}
+    .safe {{ color: #aaa; font-size: 12px; margin-top: 16px; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">💳</div>
+    <h2>{title}</h2>
+    <div class="amount">NT$ {amount:,}</div>
+    <p class="sub">點下方按鈕前往安全付款頁面</p>
+    <form method="POST" action="/pay/go/{order_id}">
+      <button type="submit" class="btn">前往付款 →</button>
+    </form>
+    <p class="safe">🔒 由 PAYUNi 提供安全加密付款</p>
+  </div>
+</body>
+</html>""", 200
+
+
+@app.route("/pay/go/<order_id>", methods=["POST"])
+def ecpay_go_post(order_id):
+    """POST：用戶真正按下按鈕後才產生 PayUni 表單"""
+    try:
+        # ── 查 payments 表（代幣包）──
+        result = supabase.table("payments").select("*").eq("order_id", order_id).execute()
+        if result.data:
+            payment = result.data[0]
+            if payment.get("status") == "confirmed":
+                return "<html><body style='font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;'><h2>✅ 此訂單已完成付款</h2><p>請返回 LINE 查看詳情 🌟</p></body></html>", 200
+            pkg_name    = payment.get("package_type", "代幣包")
+            confirm_url = f"{RENDER_URL}/pay/confirm"
+            html, mer_trade_no = ecpay_create(
+                user_id=payment["user_id"],
+                amount=payment["amount"],
+                order_id=order_id,
+                product_name=f"星運導航-{pkg_name}",
+                confirm_url=confirm_url
+            )
+            supabase.table("payments").update({
+                "mer_trade_no": mer_trade_no
+            }).eq("order_id", order_id).execute()
+            return html
+
+        # ── 查 orders 表（占卜服務）──
+        result2 = supabase.table("orders").select("*").eq("order_id", order_id).execute()
+        if result2.data:
+            order = result2.data[0]
+            if order.get("status") == "paid":
+                return "<html><body style='font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;'><h2>✅ 此訂單已完成付款</h2><p>請返回 LINE 查看詳情 🌟</p></body></html>", 200
+            service_names = {
+                "double_chart": "雙人合盤解析",
+                "year_fortune": "流年運勢報告",
+                "ziwei":        "紫微斗數命盤",
+                "love_reading": "復合分析",
+                "career":       "職場運勢",
+                "wealth":       "財運分析",
+            }
+            pkg_name    = service_names.get(order["product_type"], order["product_type"])
+            confirm_url = f"{RENDER_URL}/pay/confirm"
             html, mer_trade_no = ecpay_create(
                 user_id=order["user_id"],
                 amount=order["amount"],
-                order_id=new_trade_no,
+                order_id=order_id,
                 product_name=f"星運導航-{pkg_name}",
                 confirm_url=confirm_url
             )
@@ -2360,78 +2445,12 @@ def ecpay_go(order_id):
             }).eq("order_id", order_id).execute()
             return html
 
-        # ── 兩張表都找不到 ──
         return "<html><body style='font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;'><h2>❌ 找不到訂單</h2><p>請返回 LINE 重新操作 🙏</p></body></html>", 404
 
     except Exception as e:
-        print(f"[pay/go] 錯誤: {e}")
+        print(f"[pay/go POST] 錯誤: {e}")
         return "<html><body style='font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;'><h2>❌ 系統錯誤</h2><p>請返回 LINE 重新操作 🙏</p></body></html>", 500
 
-
-
-# ★ 修正：/pay/notify 使用正確欄位名 MerTradeNo
-@app.route("/pay/notify", methods=["POST"])
-def ecpay_notify():
-    try:
-        form_data = request.form.to_dict()
-        print(f"[PayUni notify] 收到原始資料: {form_data}")
-        if not verify_notify(form_data):
-            print(f"[PayUni notify] 驗簽失敗：{form_data}")
-            return "failure", 200
-        from payuni import get_notify_data
-        notify_data = get_notify_data(form_data)
-        print(f"[PayUni notify] 解密後資料: {notify_data}")
-        if is_payment_success(notify_data):
-            order_id = notify_data.get("MerTradeNo", "")  # ★ 修正欄位名
-            print(f"[PayUni notify] 付款成功，order_id={order_id}")
-            _activate_payment(order_id)
-        return "success", 200
-    except Exception as e:
-        print(f"[payuni_notify 錯誤] {e}")
-        return "failure", 200
-
-
-# ★ 修正：/pay/confirm 使用正確欄位名 MerTradeNo，POST 時先解密
-@app.route("/pay/confirm", methods=["GET", "POST"])
-def ecpay_confirm():
-    try:
-        print(f"[pay/confirm] method={request.method}, form={request.form.to_dict()}, args={request.args.to_dict()}")
-
-        if request.method == "POST":
-            form_data = request.form.to_dict()
-            from payuni import get_return_data
-            notify_data = get_return_data(form_data)
-            status   = notify_data.get("Status", "")
-            order_id = notify_data.get("MerTradeNo", "")
-        else:
-            status   = request.args.get("Status", "")
-            order_id = request.args.get("MerTradeNo", "")
-
-        print(f"[pay/confirm] status={status}, order_id={order_id}")
-
-        if status == "SUCCESS" and order_id:
-            _activate_payment(order_id)
-            return """<html>
-            <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-            <title>付款成功</title>
-            <style>body{font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;}h2{color:#6B4FA0;}p{color:#555;}</style>
-            </head><body>
-            <h2>✅ 付款成功！</h2><p>感謝您的購買 🌟</p>
-            <p>請返回 LINE 查看最新狀態</p>
-            <p style="color:#aaa;font-size:0.85em;margin-top:32px;">老師已準備好，隨時為您指引星途 🔮</p>
-            </body></html>""", 200
-        else:
-            return """<html>
-            <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-            <title>付款未完成</title>
-            <style>body{font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;}h2{color:#cc4444;}p{color:#555;}</style>
-            </head><body>
-            <h2>❌ 付款未完成</h2><p>請返回 LINE 重新操作</p>
-            <p style="color:#aaa;font-size:0.85em;">若有疑問請聯繫客服 🙏</p>
-            </body></html>""", 200
-    except Exception as e:
-        print(f"[ecpay_confirm 錯誤] {e}")
-        return "伺服器錯誤", 500
 
 
 
