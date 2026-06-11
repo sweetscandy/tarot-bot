@@ -35,12 +35,23 @@ def _aes_decrypt(encrypt_info: str) -> dict:
         iv  = PAYUNI_HASH_IV.encode("utf-8")
 
         stripped = encrypt_info.strip()
+
+        # 嘗試 Hex 解碼
         try:
             raw_bytes = binascii.unhexlify(stripped)
-            print(f"[PayUni _aes_decrypt] 使用 Hex 解碼")
+            print(f"[PayUni _aes_decrypt] 第一層 Hex 解碼成功，長度={len(raw_bytes)}")
+
+            # 檢查是否還有第二層 Base64
+            try:
+                inner = raw_bytes.decode("utf-8")
+                raw_bytes = base64.b64decode(inner)
+                print(f"[PayUni _aes_decrypt] 第二層 Base64 解碼成功，長度={len(raw_bytes)}")
+            except Exception:
+                print(f"[PayUni _aes_decrypt] 無第二層，直接用 Hex 結果")
+
         except Exception:
             raw_bytes = base64.b64decode(stripped)
-            print(f"[PayUni _aes_decrypt] 使用 Base64 解碼")
+            print(f"[PayUni _aes_decrypt] 使用 Base64 解碼，長度={len(raw_bytes)}")
 
         cipher = AES.new(key, AES.MODE_CBC, iv)
         raw    = unpad(cipher.decrypt(raw_bytes), AES.block_size)
@@ -52,9 +63,11 @@ def _aes_decrypt(encrypt_info: str) -> dict:
                 result[k] = urllib.parse.unquote(v)
         print(f"[PayUni _aes_decrypt] 解密成功: {result}")
         return result
+
     except Exception as e:
         print(f"[PayUni _aes_decrypt] 解密失敗: {e}")
         return {}
+
 
 
 def _generate_hash_info(encrypt_info: str) -> str:
