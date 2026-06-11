@@ -20,8 +20,8 @@ print(f"[PayUni 初始化] MerchantID={PAYUNI_MERCHANT_ID}")
 
 def _generate_trade_no() -> str:
     """產生唯一 MerTradeNo，格式：時間戳10碼 + 隨機4碼 = 14碼（符合PayUni ≤20碼限制）"""
-    ts   = str(int(time.time()))           # 10碼
-    rand = uuid.uuid4().hex[:4].upper()    # 4碼
+    ts   = str(int(time.time()))
+    rand = uuid.uuid4().hex[:4].upper()
     trade_no = ts + rand
     print(f"[PayUni] 產生 MerTradeNo: {trade_no} (長度={len(trade_no)})")
     return trade_no
@@ -37,7 +37,8 @@ def _aes_encrypt(data: dict) -> str:
     iv     = PAYUNI_HASH_IV.encode("utf-8")
     cipher = AES.new(key, AES.MODE_CBC, iv)
     encrypted = cipher.encrypt(pad(plain.encode("utf-8"), AES.block_size))
-    return base64.b64encode(encrypted).decode("utf-8")
+    # ★ 改為 Hex 編碼（PayUni 規範）
+    return encrypted.hex()
 
 
 def _aes_decrypt(encrypt_info: str) -> dict:
@@ -47,26 +48,23 @@ def _aes_decrypt(encrypt_info: str) -> dict:
 
         stripped = encrypt_info.strip()
 
-        # 嘗試第一層 Hex 解碼
+        # PayUni 回傳的 EncryptInfo 是 Hex 字串，直接解碼
         try:
             raw_bytes = binascii.unhexlify(stripped)
-            print(f"[PayUni _aes_decrypt] 第一層 Hex 解碼成功，長度={len(raw_bytes)}")
-
-            # 嘗試第二層 Base64 解碼
-            try:
-                inner     = raw_bytes.decode("utf-8")
-                raw_bytes = base64.b64decode(inner)
-                print(f"[PayUni _aes_decrypt] 第二層 Base64 解碼成功，長度={len(raw_bytes)}")
-            except Exception:
-                print(f"[PayUni _aes_decrypt] 無第二層，直接用 Hex 結果")
-
+            print(f"[PayUni _aes_decrypt] Hex 解碼成功，長度={len(raw_bytes)}")
         except Exception:
+            # fallback：嘗試 Base64
             raw_bytes = base64.b64decode(stripped)
             print(f"[PayUni _aes_decrypt] 使用 Base64 解碼，長度={len(raw_bytes)}")
 
-        # ★ 長度檢查：非 16 倍數代表是 PayUni 固定錯誤訊息，無法解密
+        # 長度檢查：非 16 倍數代表是 PayUni 固定錯誤訊息，無法解密
         if len(raw_bytes) % 16 != 0:
-            print(f"[PayUni _aes_decrypt] 長度 {len(raw_bytes)} 非 16 的倍數，為 PayUni 固定錯誤訊息，跳過解密")
+            try:
+                raw_msg = raw_bytes.decode("utf-8", errors="ignore")
+                print(f"[PayUni _aes_decrypt] 錯誤訊息原文: {raw_msg}")
+            except Exception:
+                pass
+            print(f"[PayUni _aes_decrypt] 長度 {len(raw_bytes)} 非 16 的倍數，跳過解密")
             return {}
 
         cipher = AES.new(key, AES.MODE_CBC, iv)
@@ -97,7 +95,7 @@ def create_payment(user_id: str, amount: int, order_id: str,
     notify_url = f"{render_url}/pay/notify"
 
     safe_desc    = product_name.replace("・", "-").replace("　", " ")[:50]
-    mer_trade_no = _generate_trade_no()  # ★ 改用新函式，確保 ≤20 碼且每次唯一
+    mer_trade_no = _generate_trade_no()
 
     params = {
         "MerID":       PAYUNI_MERCHANT_ID,
