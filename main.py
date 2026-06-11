@@ -206,41 +206,6 @@ SYSTEM_PROMPT = """你是「口袋裡的心靈星運導航」，一位溫柔神�
 
 pending_state = {}
 
-# ══════════════════════════════════════════
-#  追問逾時自動結束機制
-# ══════════════════════════════════════════
-follow_up_timers = {}  # {line_user_id: threading.Timer}
-
-def _cancel_follow_up_timer(line_user_id):
-    """取消現有的追問計時器"""
-    if line_user_id in follow_up_timers:
-        follow_up_timers[line_user_id].cancel()
-        del follow_up_timers[line_user_id]
-
-def _start_follow_up_timer(line_user_id, service_id, service_type, label):
-    """啟動 15 分鐘追問逾時計時器"""
-    _cancel_follow_up_timer(line_user_id)
-
-    def _on_timeout():
-        pending_state.pop(line_user_id, None)
-        follow_up_timers.pop(line_user_id, None)
-        try:
-            supabase.table("services").update({
-                "status": "completed"
-            }).eq("service_id", service_id).execute()
-        except Exception as e:
-            print(f"[逾時結束] 更新服務狀態失敗: {e}")
-        push_text(
-            line_user_id,
-            f"🌙 {label} 服務已自動結束\n\n"
-            f"超過 15 分鐘未追問，老師已為您關閉本次服務 ✨\n\n"
-            f"若有新的問題，歡迎隨時再次購買服務 💎"
-        )
-
-    timer = threading.Timer(15 * 60, _on_timeout)
-    timer.daemon = True
-    timer.start()
-    follow_up_timers[line_user_id] = timer
 
 # ══════════════════════════════════════════
 #  工具函式
@@ -1185,7 +1150,6 @@ def _run_career_background(line_user_id, data, service_id):
         # ★ 再推送追問卡片或結束訊息
         if remaining > 0:
             push_flex(line_user_id, build_follow_up_flex("career", remaining, "💼 職場運勢"))
-            _start_follow_up_timer(line_user_id, service_id, "career", "💼 職場運勢")
         else:
             supabase.table("services").update({
                 "status": "completed"
@@ -1262,7 +1226,6 @@ def _run_wealth_background(line_user_id, data, service_id):
         # ★ 再推送追問卡片或結束訊息
         if remaining > 0:
             push_flex(line_user_id, build_follow_up_flex("wealth", remaining, "💰 財運分析"))
-            _start_follow_up_timer(line_user_id, service_id, "wealth", "💰 財運分析")
         else:
             supabase.table("services").update({
                 "status": "completed"
@@ -1331,8 +1294,8 @@ def _run_double_chart_background(line_user_id, data, service_id):
         push_text(line_user_id, f"💑 雙人合盤解析\n\n{response_text}{footer}")
 
         # ★ 再推送追問卡片 + 啟動計時器
+        push_text(line_user_id, f"💑 雙人合盤解析\n\n{response_text}{footer}")
         push_flex(line_user_id, build_follow_up_flex("double_chart", limit, "💑 雙人合盤"))
-        _start_follow_up_timer(line_user_id, service_id, "double_chart", "💑 雙人合盤")
 
     except Exception as e:
         print(f"[雙人合盤背景錯誤] {line_user_id}: {e}")
@@ -1389,8 +1352,8 @@ def _run_year_fortune_background(line_user_id, data, service_id):
         push_text(line_user_id, f"📅 {current_year} 流年運勢報告\n\n{response_text}{footer}")
 
         # ★ 再推送追問卡片 + 啟動計時器
+        push_text(line_user_id, f"📅 {current_year} 流年運勢報告\n\n{response_text}{footer}")
         push_flex(line_user_id, build_follow_up_flex("year_fortune", limit, "📅 流年運勢"))
-        _start_follow_up_timer(line_user_id, service_id, "year_fortune", "📅 流年運勢")
 
     except Exception as e:
         print(f"[流年運勢背景錯誤] {line_user_id}: {e}")
@@ -1447,8 +1410,8 @@ def _run_ziwei_background(line_user_id, data, service_id):
         push_text(line_user_id, f"⭐ 紫微斗數命盤解析\n\n{response_text}{footer}")
 
         # ★ 再推送追問卡片 + 啟動計時器
+        push_text(line_user_id, f"⭐ 紫微斗數命盤解析\n\n{response_text}{footer}")
         push_flex(line_user_id, build_follow_up_flex("ziwei", limit, "⭐ 紫微斗數"))
-        _start_follow_up_timer(line_user_id, service_id, "ziwei", "⭐ 紫微斗數")
 
     except Exception as e:
         print(f"[紫微斗數背景錯誤] {line_user_id}: {e}")
@@ -1508,7 +1471,6 @@ def _run_follow_up_background(line_user_id, service_type, question, service_id, 
         # ★ 再判斷是否還有追問次數
         if remaining > 0:
             push_flex(line_user_id, build_follow_up_flex(service_type, remaining, label))
-            _start_follow_up_timer(line_user_id, service_id, service_type, label)
         else:
             # 追問次數用完，標記服務完成
             try:
@@ -1655,12 +1617,10 @@ def build_follow_up_flex(service_type, remaining, label):
                 {"type": "text",
                  "text": "可以針對剛才的解析繼續深入提問\n或選擇結束本次服務",
                  "color": "#888888", "size": "xs", "wrap": True},
-                {"type": "separator"},
-                {"type": "text",
-                 "text": "⏰ 若 15 分鐘內未追問，服務將自動結束",
-                 "color": "#AAAAAA", "size": "xs", "wrap": True}
+                # ★ 移除 separator 和 15 分鐘提示那兩行
             ]
         },
+
         "footer": {
             "type": "box", "layout": "vertical", "spacing": "sm",
             "contents": [
@@ -3323,8 +3283,6 @@ def handle_message(event):
                 service_type = state.get("service_type")
                 service_id   = state.get("service_id")
                 follow_up_num = state.get("follow_up_num", 1)
-                # ★ 取消計時器（用戶已回應）
-                _cancel_follow_up_timer(line_user_id)
                 pending_state.pop(line_user_id, None)
                 wait_msg = random.choice(WAITING_MSGS_TIANBOOK)
                 with ApiClient(configuration) as api_client:
@@ -4325,8 +4283,6 @@ def handle_postback(event):
 
     # ★ 追問按鈕：取消計時器 + 進入追問狀態
     elif data.startswith("follow_up_"):
-        # ★ 取消 15 分鐘逾時計時器
-        _cancel_follow_up_timer(line_user_id)
         service_type = data.replace("follow_up_", "")
         svc = get_active_service(line_user_id, service_type)
         if not svc:
