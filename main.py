@@ -727,6 +727,33 @@ def process_referral(new_user_id, ref_code):
             f"💎 推薦滿 3 人或 5 人可獲得代幣獎勵 🌙"
         )
 
+
+# ══════════════════════════════════════════
+#  每月自動補充代幣
+# ══════════════════════════════════════════
+
+def do_monthly_token_refill():
+    """每月1日自動補充所有用戶 1 顆代幣"""
+    print(f"[排程] 每月補幣啟動：{datetime.datetime.now()}")
+    try:
+        result = supabase.table("users").select("line_user_id, tokens").execute()
+        users = result.data or []
+        for u in users:
+            uid = u["line_user_id"]
+            current = u.get("tokens") or 0
+            supabase.table("users").update(
+                {"tokens": current + 1}
+            ).eq("line_user_id", uid).execute()
+            supabase.table("token_logs").insert({
+                "line_user_id": uid,
+                "change": 1,
+                "reason": "每月自動補充"
+            }).execute()
+        print(f"[排程] 每月補幣完成，共 {len(users)} 位用戶")
+    except Exception as e:
+        print(f"[排程] 每月補幣失敗：{e}")
+
+
 # ══════════════════════════════════════════
 #  占卜核心（背景執行）
 # ══════════════════════════════════════════
@@ -1090,7 +1117,7 @@ def _run_love_reading_background(line_user_id, situation, question_num, service_
 
 
 # ══════════════════════════════════════════
-#  職場運勢核心（背景執行）★ 已修改：加入追問卡片
+#  職場運勢核心（背景執行）
 # ══════════════════════════════════════════
 
 def _run_career_background(line_user_id, data, service_id):
@@ -1141,10 +1168,8 @@ def _run_career_background(line_user_id, data, service_id):
             mark_service_used(service_id)
 
         footer = get_lucky_item_text()
-        # ★ 先推送解析內容
         push_text(line_user_id, f"💼 職場運勢解析\n\n{response_text}{footer}")
 
-        # ★ 再推送追問卡片或結束訊息
         if remaining > 0:
             push_flex(line_user_id, build_follow_up_flex("career", remaining, "💼 職場運勢"))
         else:
@@ -1164,7 +1189,7 @@ def _run_career_background(line_user_id, data, service_id):
 
 
 # ══════════════════════════════════════════
-#  財運分析核心（背景執行）★ 已修改：加入追問卡片
+#  財運分析核心（背景執行）
 # ══════════════════════════════════════════
 
 def _run_wealth_background(line_user_id, data, service_id):
@@ -1217,10 +1242,8 @@ def _run_wealth_background(line_user_id, data, service_id):
             mark_service_used(service_id)
 
         footer = get_lucky_item_text()
-        # ★ 先推送解析內容
         push_text(line_user_id, f"💰 財運分析｜{hexagram}\n\n{response_text}{footer}")
 
-        # ★ 再推送追問卡片或結束訊息
         if remaining > 0:
             push_flex(line_user_id, build_follow_up_flex("wealth", remaining, "💰 財運分析"))
         else:
@@ -1240,7 +1263,7 @@ def _run_wealth_background(line_user_id, data, service_id):
 
 
 # ══════════════════════════════════════════
-#  天書服務核心（背景執行）★ 已修改：加入追問卡片
+#  天書服務核心（背景執行）
 # ══════════════════════════════════════════
 
 def _run_double_chart_background(line_user_id, data, service_id):
@@ -1286,11 +1309,7 @@ def _run_double_chart_background(line_user_id, data, service_id):
 
         footer = get_lucky_item_text()
         limit = FOLLOW_UP_LIMITS.get("double_chart", 1)
-
-        # ★ 先推送解析內容
         push_text(line_user_id, f"💑 雙人合盤解析\n\n{response_text}{footer}")
-
-        # ★ 再推送追問卡片 + 啟動計時器
         push_flex(line_user_id, build_follow_up_flex("double_chart", limit, "💑 雙人合盤"))
 
     except Exception as e:
@@ -1343,11 +1362,7 @@ def _run_year_fortune_background(line_user_id, data, service_id):
 
         footer = get_lucky_item_text()
         limit = FOLLOW_UP_LIMITS.get("year_fortune", 1)
-
-        # ★ 先推送解析內容
         push_text(line_user_id, f"📅 {current_year} 流年運勢報告\n\n{response_text}{footer}")
-
-        # ★ 再推送追問卡片 + 啟動計時器
         push_flex(line_user_id, build_follow_up_flex("year_fortune", limit, "📅 流年運勢"))
 
     except Exception as e:
@@ -1400,11 +1415,7 @@ def _run_ziwei_background(line_user_id, data, service_id):
 
         footer = get_lucky_item_text()
         limit = FOLLOW_UP_LIMITS.get("ziwei", 2)
-
-        # ★ 先推送解析內容
         push_text(line_user_id, f"⭐ 紫微斗數命盤解析\n\n{response_text}{footer}")
-
-        # ★ 再推送追問卡片 + 啟動計時器
         push_flex(line_user_id, build_follow_up_flex("ziwei", limit, "⭐ 紫微斗數"))
 
     except Exception as e:
@@ -1413,7 +1424,7 @@ def _run_ziwei_background(line_user_id, data, service_id):
 
 
 # ══════════════════════════════════════════
-#  追問處理（天書服務共用）★ 已修改：加入追問卡片
+#  追問處理（天書服務共用）
 # ══════════════════════════════════════════
 
 def _run_follow_up_background(line_user_id, service_type, question, service_id, follow_up_num):
@@ -1459,14 +1470,11 @@ def _run_follow_up_background(line_user_id, service_type, question, service_id, 
         except Exception as e:
             print(f"[追問 tarot_logs 寫入錯誤] {e}")
 
-        # ★ 先推送追問解讀內容
         push_text(line_user_id, f"{label}｜追問解讀\n\n{response_text}")
 
-        # ★ 再判斷是否還有追問次數
         if remaining > 0:
             push_flex(line_user_id, build_follow_up_flex(service_type, remaining, label))
         else:
-            # 追問次數用完，標記服務完成
             try:
                 supabase.table("services").update({
                     "status": "completed"
@@ -1579,14 +1587,7 @@ def do_daily_push():
 #  Flex Message 工廠
 # ══════════════════════════════════════════
 
-# ★ 新增：追問卡片
 def build_follow_up_flex(service_type, remaining, label):
-    """
-    解析完成後推送的追問卡片
-    service_type : "ziwei" / "double_chart" / "year_fortune" / "career" / "wealth"
-    remaining    : 剩餘追問次數
-    label        : 顯示名稱，如 "⭐ 紫微斗數"
-    """
     flex_content = {
         "type": "bubble",
         "styles": {
@@ -1611,10 +1612,8 @@ def build_follow_up_flex(service_type, remaining, label):
                 {"type": "text",
                  "text": "可以針對剛才的解析繼續深入提問\n或選擇結束本次服務",
                  "color": "#888888", "size": "xs", "wrap": True},
-                # ★ 移除 separator 和 15 分鐘提示那兩行
             ]
         },
-
         "footer": {
             "type": "box", "layout": "vertical", "spacing": "sm",
             "contents": [
@@ -2592,14 +2591,11 @@ def ecpay_notify():
     try:
         form_data = request.form.to_dict()
         print(f"[PayUni notify] 收到原始資料: {form_data}")
-
         if not verify_notify(form_data):
             print(f"[PayUni notify] 驗簽失敗：{form_data}")
             return "failure", 200
-
         notify_data = get_notify_data(form_data)
         print(f"[PayUni notify] 解密後資料: {notify_data}")
-
         if is_payment_success(notify_data):
             order_id = notify_data.get("MerTradeNo", "")
             print(f"[PayUni notify] 付款成功，order_id={order_id}")
@@ -2609,9 +2605,7 @@ def ecpay_notify():
                 print("[PayUni notify] 付款成功但 MerTradeNo 為空")
         else:
             print(f"[PayUni notify] 非付款成功狀態：{notify_data}")
-
         return "success", 200
-
     except Exception as e:
         print(f"[payuni_notify 錯誤] {e}")
         return "failure", 200
@@ -2625,7 +2619,6 @@ def ecpay_confirm():
             f"form={request.form.to_dict()}, "
             f"args={request.args.to_dict()}"
         )
-
         if request.method == "POST":
             form_data = request.form.to_dict()
             return_data = get_return_data(form_data)
@@ -2648,7 +2641,6 @@ def ecpay_confirm():
             <p style="color:#aaa;font-size:0.85em;margin-top:32px;">老師已準備好，隨時為您指引星途 🔮</p>
             </body></html>""", 200
 
-        error_code = status or "UNKNOWN"
         return f"""<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
         <title>付款未完成</title>
         <style>body{{font-family:sans-serif;text-align:center;padding:50px;background:#F8F4FF;}}h2{{color:#cc4444;}}p{{color:#555;}}.code{{margin-top:20px;color:#aaa;font-size:0.85em;}}</style>
@@ -2900,7 +2892,6 @@ def handle_message(event):
         mode = state.get("mode")
         step = state.get("step")
 
-        # ── 靈性占卜 ──
         if mode == "spiritual":
             data = state.get("data", {})
             if step == "q1":
@@ -2950,7 +2941,6 @@ def handle_message(event):
                 t.start()
                 return
 
-        # ── 急救占卜 ──
         elif mode == "deep" and step == "question":
             reading_type = state.get("type", "tarot")
             pending_state.pop(line_user_id, None)
@@ -2963,7 +2953,6 @@ def handle_message(event):
             do_reading_async(line_user_id, user_msg, reading_type, True, zodiac, user)
             return
 
-        # ── 今日運勢 ──
         elif mode == "daily" and step == "question":
             reading_type = state.get("type", "tarot")
             can_read, quota_msg = check_free_reading_quota(line_user_id, user)
@@ -3005,7 +2994,6 @@ def handle_message(event):
             do_reading_async(line_user_id, user_msg, reading_type, False, zodiac, user)
             return
 
-        # ── 雙人合盤 ──
         elif mode == "double_chart":
             data = state.get("data", {})
             if step == "birth1":
@@ -3087,7 +3075,6 @@ def handle_message(event):
                         ))
                 return
 
-        # ── 流年運勢 ──
         elif mode == "year_fortune":
             data = state.get("data", {})
             if step == "birth":
@@ -3132,7 +3119,6 @@ def handle_message(event):
                         ))
                 return
 
-        # ── 紫微斗數 ──
         elif mode == "ziwei":
             data = state.get("data", {})
             if step == "birth":
@@ -3180,7 +3166,6 @@ def handle_message(event):
                     ))
                 return
 
-        # ── 復合分析 ──
         elif mode == "love_reading":
             if step == "question":
                 service_id = state.get("service_id")
@@ -3210,7 +3195,6 @@ def handle_message(event):
                     }
                 return
 
-        # ── 職場運勢 ──
         elif mode == "career":
             data = state.get("data", {})
             if step == "birth":
@@ -3255,7 +3239,6 @@ def handle_message(event):
                 follow_up_num = state.get("follow_up_num", 1)
                 data["question"] = user_msg
                 data["follow_up_num"] = follow_up_num
-                # ★ 清除 pending_state，讓背景函式的追問卡片接管
                 pending_state.pop(line_user_id, None)
                 wait_msg = random.choice(WAITING_MSGS_CAREER)
                 with ApiClient(configuration) as api_client:
@@ -3271,7 +3254,6 @@ def handle_message(event):
                 t.start()
                 return
 
-        # ── 追問（天書服務共用）──
         elif mode == "follow_up":
             if step == "question":
                 service_type = state.get("service_type")
@@ -3292,7 +3274,6 @@ def handle_message(event):
                 t.start()
                 return
 
-        # ── 財運分析 ──
         elif mode == "wealth":
             data = state.get("data", {})
             if step == "birth":
@@ -3337,7 +3318,6 @@ def handle_message(event):
                 follow_up_num = state.get("follow_up_num", 1)
                 data["question"] = user_msg
                 data["follow_up_num"] = follow_up_num
-                # ★ 清除 pending_state，讓背景函式的追問卡片接管
                 pending_state.pop(line_user_id, None)
                 wait_msg = random.choice(WAITING_MSGS_WEALTH)
                 with ApiClient(configuration) as api_client:
@@ -3891,7 +3871,6 @@ def handle_postback(event):
     user = get_or_create_user(line_user_id)
     zodiac = get_zodiac(user.get("birth_date")) if user.get("birth_date") else None
 
-    # ── 生辰日期選擇器綁定 ──
     if data == "bind_birth":
         selected_date = event.postback.params.get("date")
         if not selected_date:
@@ -3929,7 +3908,6 @@ def handle_postback(event):
             ))
         return
 
-    # ── 生辰確認卡片 Postback ──
     elif data.startswith("birth_confirm_yes_"):
         confirmed_date = data.replace("birth_confirm_yes_", "")
         if line_user_id not in pending_state:
@@ -4017,14 +3995,12 @@ def handle_postback(event):
             return
         state = pending_state[line_user_id]
         step  = state.get("step")
-
         if step == "birth1_confirm":
             state["step"] = "birth1"
         elif step == "birth2_confirm":
             state["step"] = "birth2"
         else:
             state["step"] = "birth"
-
         pending_state[line_user_id] = state
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
@@ -4275,7 +4251,7 @@ def handle_postback(event):
             ))
         return
 
-    # ★ 追問按鈕：取消計時器 + 進入追問狀態
+    # ★ 追問按鈕（含硬性次數驗證，修復無限追問 BUG）
     elif data.startswith("follow_up_"):
         service_type = data.replace("follow_up_", "")
         svc = get_active_service(line_user_id, service_type)
@@ -4286,6 +4262,24 @@ def handle_postback(event):
                     messages=[TextMessage(text="⚠️ 追問次數已用完，或找不到有效服務 🙏")]
                 ))
             return
+
+        # ★ 硬性驗證：再次確認追問次數未超限
+        current_count = svc.get("follow_up_count") or 0
+        limit = FOLLOW_UP_LIMITS.get(service_type, 0)
+        if current_count >= limit:
+            try:
+                supabase.table("services").update({
+                    "status": "completed"
+                }).eq("service_id", svc["service_id"]).execute()
+            except Exception:
+                pass
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text="⚠️ 追問次數已全部使用完畢 🙏\n\n若有新的困惑，歡迎再次購買服務 💎")]
+                ))
+            return
+
         service_labels = {
             "double_chart": "💑 雙人合盤",
             "year_fortune":  "📅 流年運勢",
@@ -4299,7 +4293,7 @@ def handle_postback(event):
             "step": "question",
             "service_type": service_type,
             "service_id": svc["service_id"],
-            "follow_up_num": (svc.get("follow_up_count") or 0) + 1
+            "follow_up_num": current_count + 1
         }
         with ApiClient(configuration) as api_client:
             MessagingApi(api_client).reply_message(ReplyMessageRequest(
@@ -4311,9 +4305,7 @@ def handle_postback(event):
     # ★ 結束服務按鈕
     elif data.startswith("end_service_"):
         service_type = data.replace("end_service_", "")
-        # 清除 pending_state
         pending_state.pop(line_user_id, None)
-        # 標記服務完成
         svc = get_active_service(line_user_id, service_type)
         if svc:
             try:
@@ -4357,12 +4349,23 @@ def handle_postback(event):
 # ══════════════════════════════════════════
 
 scheduler = BackgroundScheduler(timezone="Asia/Taipei")
+
+# 每日早上 8:00 推播
 scheduler.add_job(
     do_daily_push, "cron",
     hour=8, minute=0,
     id="daily_push",
     replace_existing=True
 )
+
+# ★ 每月 1 日早上 8:05 自動補充代幣
+scheduler.add_job(
+    do_monthly_token_refill, "cron",
+    day=1, hour=8, minute=5,
+    id="monthly_refill",
+    replace_existing=True
+)
+
 scheduler.start()
 
 
