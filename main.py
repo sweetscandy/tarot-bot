@@ -27,14 +27,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
 
-# ══════════════════════════════════════════
-#  管理員設定
-# ══════════════════════════════════════════
 ADMIN_USER_ID = "U50df8621612919931dee55554de9692a"
 
-# ══════════════════════════════════════════
-#  自我 ping — 防止 Render 休眠
-# ══════════════════════════════════════════
 def _keep_alive():
     time.sleep(60)
     while True:
@@ -58,7 +52,6 @@ RENDER_URL = os.environ.get("RENDER_URL", "https://tarot-bot-qqgg.onrender.com")
 FREE_READING_LIMIT = 3
 SHOP_URL = "https://crystal-shop-62a69.web.app/index.html"
 
-# ══ 追問上限設定 ══
 FOLLOW_UP_LIMITS = {
     "double_chart": 1,
     "year_fortune":  1,
@@ -436,11 +429,20 @@ def mark_service_used(service_id):
     }).eq("service_id", service_id).execute()
 
 
+# ★ 修改一：increment_follow_up 改用 Supabase RPC 原子操作，防止 race condition
 def increment_follow_up(service_id):
-    result = supabase.table("services").select("follow_up_count").eq("service_id", service_id).execute()
-    current = (result.data[0].get("follow_up_count") or 0) if result.data else 0
-    supabase.table("services").update({"follow_up_count": current + 1}).eq("service_id", service_id).execute()
-    return current + 1
+    try:
+        result = supabase.rpc(
+            "increment_follow_up_count",
+            {"sid": service_id}
+        ).execute()
+        return result.data if isinstance(result.data, int) else 1
+    except Exception as e:
+        print(f"[increment_follow_up RPC 錯誤，fallback] {e}")
+        result = supabase.table("services").select("follow_up_count").eq("service_id", service_id).execute()
+        current = (result.data[0].get("follow_up_count") or 0) if result.data else 0
+        supabase.table("services").update({"follow_up_count": current + 1}).eq("service_id", service_id).execute()
+        return current + 1
 
 
 # ══════════════════════════════════════════
@@ -733,7 +735,6 @@ def process_referral(new_user_id, ref_code):
 # ══════════════════════════════════════════
 
 def do_monthly_token_refill():
-    """每月1日自動補充所有用戶 1 顆代幣"""
     print(f"[排程] 每月補幣啟動：{datetime.datetime.now()}")
     try:
         result = supabase.table("users").select("line_user_id, tokens").execute()
@@ -1171,7 +1172,7 @@ def _run_career_background(line_user_id, data, service_id):
         push_text(line_user_id, f"💼 職場運勢解析\n\n{response_text}{footer}")
 
         if remaining > 0:
-            push_flex(line_user_id, build_follow_up_flex("career", remaining, "💼 職場運勢"))
+            push_flex(line_user_id, build_follow_up_flex("career", remaining, "💼 職場運勢", follow_up_num))
         else:
             supabase.table("services").update({
                 "status": "completed"
@@ -1245,7 +1246,7 @@ def _run_wealth_background(line_user_id, data, service_id):
         push_text(line_user_id, f"💰 財運分析｜{hexagram}\n\n{response_text}{footer}")
 
         if remaining > 0:
-            push_flex(line_user_id, build_follow_up_flex("wealth", remaining, "💰 財運分析"))
+            push_flex(line_user_id, build_follow_up_flex("wealth", remaining, "💰 財運分析", follow_up_num))
         else:
             supabase.table("services").update({
                 "status": "completed"
@@ -1310,7 +1311,7 @@ def _run_double_chart_background(line_user_id, data, service_id):
         footer = get_lucky_item_text()
         limit = FOLLOW_UP_LIMITS.get("double_chart", 1)
         push_text(line_user_id, f"💑 雙人合盤解析\n\n{response_text}{footer}")
-        push_flex(line_user_id, build_follow_up_flex("double_chart", limit, "💑 雙人合盤"))
+        push_flex(line_user_id, build_follow_up_flex("double_chart", limit, "💑 雙人合盤", 0))
 
     except Exception as e:
         print(f"[雙人合盤背景錯誤] {line_user_id}: {e}")
@@ -1363,7 +1364,7 @@ def _run_year_fortune_background(line_user_id, data, service_id):
         footer = get_lucky_item_text()
         limit = FOLLOW_UP_LIMITS.get("year_fortune", 1)
         push_text(line_user_id, f"📅 {current_year} 流年運勢報告\n\n{response_text}{footer}")
-        push_flex(line_user_id, build_follow_up_flex("year_fortune", limit, "📅 流年運勢"))
+        push_flex(line_user_id, build_follow_up_flex("year_fortune", limit, "📅 流年運勢", 0))
 
     except Exception as e:
         print(f"[流年運勢背景錯誤] {line_user_id}: {e}")
@@ -1416,7 +1417,7 @@ def _run_ziwei_background(line_user_id, data, service_id):
         footer = get_lucky_item_text()
         limit = FOLLOW_UP_LIMITS.get("ziwei", 2)
         push_text(line_user_id, f"⭐ 紫微斗數命盤解析\n\n{response_text}{footer}")
-        push_flex(line_user_id, build_follow_up_flex("ziwei", limit, "⭐ 紫微斗數"))
+        push_flex(line_user_id, build_follow_up_flex("ziwei", limit, "⭐ 紫微斗數", 0))
 
     except Exception as e:
         print(f"[紫微斗數背景錯誤] {line_user_id}: {e}")
@@ -1473,7 +1474,7 @@ def _run_follow_up_background(line_user_id, service_type, question, service_id, 
         push_text(line_user_id, f"{label}｜追問解讀\n\n{response_text}")
 
         if remaining > 0:
-            push_flex(line_user_id, build_follow_up_flex(service_type, remaining, label))
+            push_flex(line_user_id, build_follow_up_flex(service_type, remaining, label, new_count))
         else:
             try:
                 supabase.table("services").update({
@@ -1587,7 +1588,8 @@ def do_daily_push():
 #  Flex Message 工廠
 # ══════════════════════════════════════════
 
-def build_follow_up_flex(service_type, remaining, label):
+# ★ 修改二：build_follow_up_flex 新增 current_count 參數，帶入 postback data 防止舊卡片重複點擊
+def build_follow_up_flex(service_type, remaining, label, current_count=0):
     flex_content = {
         "type": "bubble",
         "styles": {
@@ -1622,7 +1624,7 @@ def build_follow_up_flex(service_type, remaining, label):
                     "action": {
                         "type": "postback",
                         "label": f"💬 我要追問（剩 {remaining} 次）",
-                        "data": f"follow_up_{service_type}"
+                        "data": f"follow_up_{service_type}_{current_count}"  # ★ 帶入當前次數
                     }
                 },
                 {
@@ -2737,9 +2739,6 @@ def handle_message(event):
 
     zodiac = get_zodiac(user.get("birth_date")) if user.get("birth_date") else None
 
-    # ══════════════════════════════════════
-    #  管理員指令
-    # ══════════════════════════════════════
     if line_user_id == ADMIN_USER_ID:
 
         if user_msg in ["管理員指令", "admin", "Admin"]:
@@ -2884,9 +2883,6 @@ def handle_message(event):
                         ))
             return
 
-    # ══════════════════════════════════════
-    #  pending_state 狀態機
-    # ══════════════════════════════════════
     if line_user_id in pending_state:
         state = pending_state[line_user_id]
         mode = state.get("mode")
@@ -4251,9 +4247,17 @@ def handle_postback(event):
             ))
         return
 
-    # ★ 追問按鈕（含硬性次數驗證，修復無限追問 BUG）
+    # ★ 修改二：追問按鈕驗證（防舊卡片 + 防超限）
     elif data.startswith("follow_up_"):
-        service_type = data.replace("follow_up_", "")
+        # 解析 service_type 與卡片上記錄的 expected_count
+        parts = data.replace("follow_up_", "").rsplit("_", 1)
+        if len(parts) == 2 and parts[1].isdigit():
+            service_type = parts[0]
+            expected_count = int(parts[1])
+        else:
+            service_type = data.replace("follow_up_", "")
+            expected_count = None
+
         svc = get_active_service(line_user_id, service_type)
         if not svc:
             with ApiClient(configuration) as api_client:
@@ -4263,9 +4267,10 @@ def handle_postback(event):
                 ))
             return
 
-        # ★ 硬性驗證：再次確認追問次數未超限
         current_count = svc.get("follow_up_count") or 0
         limit = FOLLOW_UP_LIMITS.get(service_type, 0)
+
+        # ★ 硬性驗證：次數已達上限
         if current_count >= limit:
             try:
                 supabase.table("services").update({
@@ -4277,6 +4282,15 @@ def handle_postback(event):
                 MessagingApi(api_client).reply_message(ReplyMessageRequest(
                     reply_token=event.reply_token,
                     messages=[TextMessage(text="⚠️ 追問次數已全部使用完畢 🙏\n\n若有新的困惑，歡迎再次購買服務 💎")]
+                ))
+            return
+
+        # ★ 防舊卡片：比對卡片上的次數與資料庫是否一致
+        if expected_count is not None and current_count != expected_count:
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text="⚠️ 此追問卡片已失效，請查看最新的解析訊息 🙏")]
                 ))
             return
 
@@ -4350,7 +4364,6 @@ def handle_postback(event):
 
 scheduler = BackgroundScheduler(timezone="Asia/Taipei")
 
-# 每日早上 8:00 推播
 scheduler.add_job(
     do_daily_push, "cron",
     hour=8, minute=0,
@@ -4358,7 +4371,6 @@ scheduler.add_job(
     replace_existing=True
 )
 
-# ★ 每月 1 日早上 8:05 自動補充代幣
 scheduler.add_job(
     do_monthly_token_refill, "cron",
     day=1, hour=8, minute=5,
