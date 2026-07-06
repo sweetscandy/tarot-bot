@@ -429,7 +429,6 @@ def mark_service_used(service_id):
     }).eq("service_id", service_id).execute()
 
 
-# ★ 修改一：increment_follow_up 改用 Supabase RPC 原子操作，防止 race condition
 def increment_follow_up(service_id):
     try:
         result = supabase.rpc(
@@ -974,7 +973,7 @@ def _run_spiritual_background(line_user_id, data, zodiac):
             supabase.table("tarot_logs").insert({
                 "line_user_id": line_user_id,
                 "card_name": "靈性占卜",
-                "reading": response_text,
+                 "reading": response_text,
                 "category": "靈性占卜",
                 "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
             }).execute()
@@ -1588,7 +1587,6 @@ def do_daily_push():
 #  Flex Message 工廠
 # ══════════════════════════════════════════
 
-# ★ 修改二：build_follow_up_flex 新增 current_count 參數，帶入 postback data 防止舊卡片重複點擊
 def build_follow_up_flex(service_type, remaining, label, current_count=0):
     flex_content = {
         "type": "bubble",
@@ -1624,7 +1622,7 @@ def build_follow_up_flex(service_type, remaining, label, current_count=0):
                     "action": {
                         "type": "postback",
                         "label": f"💬 我要追問（剩 {remaining} 次）",
-                        "data": f"follow_up_{service_type}_{current_count}"  # ★ 帶入當前次數
+                        "data": f"follow_up_{service_type}_{current_count}"
                     }
                 },
                 {
@@ -2017,25 +2015,27 @@ def build_life_navigation_flex():
         "body": {
             "type": "box", "layout": "vertical", "spacing": "sm",
             "contents": [
-                {"type": "text", "text": "💔 復合分析　NT$150／題，上限 5 題", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
+                # ★ 已更新價格
+                {"type": "text", "text": "💔 復合分析　NT$100／題，上限 5 題", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
                 {"type": "text", "text": "塔羅牌解讀，每題抽一張牌，最多追問 5 次", "color": "#888888", "size": "xs", "wrap": True},
                 {"type": "separator"},
-                {"type": "text", "text": "💼 職場運勢　NT$800", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
+                {"type": "text", "text": "💼 職場運勢　NT$150", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
                 {"type": "text", "text": "八字命理深度解析，含 2 次追問機會", "color": "#888888", "size": "xs", "wrap": True},
                 {"type": "separator"},
-                {"type": "text", "text": "💰 財運分析　NT$500", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
+                {"type": "text", "text": "💰 財運分析　NT$150", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
                 {"type": "text", "text": "易經卦象解讀，含 1 次追問機會", "color": "#888888", "size": "xs", "wrap": True},
             ]
         },
         "footer": {
             "type": "box", "layout": "vertical", "spacing": "sm",
             "contents": [
+                # ★ 已更新按鈕文字
                 {"type": "button", "style": "primary", "color": "#6B4FA0",
-                 "action": {"type": "message", "label": "💔 復合分析 NT$150／題", "text": "復合分析"}},
+                 "action": {"type": "message", "label": "💔 復合分析 NT$100／題", "text": "復合分析"}},
                 {"type": "button", "style": "primary", "color": "#4A3080",
-                 "action": {"type": "message", "label": "💼 職場運勢 NT$800", "text": "職場運勢"}},
+                 "action": {"type": "message", "label": "💼 職場運勢 NT$150", "text": "職場運勢"}},
                 {"type": "button", "style": "primary", "color": "#2D1B69",
-                 "action": {"type": "message", "label": "💰 財運分析 NT$500", "text": "財運分析"}}
+                 "action": {"type": "message", "label": "💰 財運分析 NT$150", "text": "財運分析"}}
             ]
         }
     }
@@ -2076,7 +2076,8 @@ def build_fortune_stick_category_flex():
             ]
         }
     }
-    return FlexMessage(alt_text="求籤問卜 - 選擇類別", contents=FlexContainer.from_dict(flex_content))
+    return FlexMessage(alt_text="求籤問卜 - 選擇類別", contents=
+FlexContainer.from_dict(flex_content))
 
 
 def build_fortune_stick_question_flex(category):
@@ -2207,13 +2208,14 @@ def build_token_shop_flex():
         "body": {
             "type": "box", "layout": "vertical", "spacing": "sm",
             "contents": [
-                {"type": "text", "text": "✨ 星塵入門包　$500 → 3 顆", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
+                # ★ 已更新價格
+                {"type": "text", "text": "✨ 星塵入門包　$150 → 3 顆", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
                 {"type": "text", "text": "踏入星盤的第一步，命運從這裡開始轉動", "color": "#888888", "size": "xs", "wrap": True},
                 {"type": "separator"},
-                {"type": "text", "text": "🌙 月光超值包　$1,200 → 8 顆", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
-                {"type": "text", "text": "最受歡迎！平均每顆只要 $150，星辰常伴左右", "color": "#888888", "size": "xs", "wrap": True},
+                {"type": "text", "text": "🌙 月光超值包　$360 → 8 顆", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
+                {"type": "text", "text": "最受歡迎！平均每顆只要 $45，星辰常伴左右", "color": "#888888", "size": "xs", "wrap": True},
                 {"type": "separator"},
-                {"type": "text", "text": "🌌 星河豪華包　$2,000 → 15 顆", "color": "#B8860B", "weight": "bold", "size": "sm"},
+                {"type": "text", "text": "🌌 星河豪華包　$600 → 15 顆", "color": "#B8860B", "weight": "bold", "size": "sm"},
                 {"type": "text", "text": "深度陪伴，讓老師全年守護你的每個轉折", "color": "#888888", "size": "xs", "wrap": True},
                 {"type": "separator"},
                 {"type": "text", "text": "💡 代幣用途", "color": "#888888", "size": "xs", "weight": "bold"},
@@ -2223,12 +2225,13 @@ def build_token_shop_flex():
         "footer": {
             "type": "box", "layout": "vertical", "spacing": "sm",
             "contents": [
+                # ★ 已更新按鈕文字
                 {"type": "button", "style": "primary", "color": "#6B4FA0",
-                 "action": {"type": "message", "label": "✨ 星塵入門包 $500 → 3顆", "text": "購買星塵入門包"}},
+                 "action": {"type": "message", "label": "✨ 星塵入門包 $150 → 3顆", "text": "購買星塵入門包"}},
                 {"type": "button", "style": "primary", "color": "#4A3080",
-                 "action": {"type": "message", "label": "🌙 月光超值包 $1,200 → 8顆", "text": "購買月光超值包"}},
+                 "action": {"type": "message", "label": "🌙 月光超值包 $360 → 8顆", "text": "購買月光超值包"}},
                 {"type": "button", "style": "primary", "color": "#2D1B69",
-                 "action": {"type": "message", "label": "🌌 星河豪華包 $2,000 → 15顆", "text": "購買星河豪華包"}}
+                 "action": {"type": "message", "label": "🌌 星河豪華包 $600 → 15顆", "text": "購買星河豪華包"}}
             ]
         }
     }
@@ -2251,13 +2254,13 @@ def build_tianbook_flex():
             "contents": [
                 {"type": "text", "text": "選擇您想深度解析的方向：", "color": "#555555", "size": "sm"},
                 {"type": "separator"},
-                {"type": "text", "text": "💑 雙人合盤　NT$1,500", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
+                {"type": "text", "text": "💑 雙人合盤　NT$300", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
                 {"type": "text", "text": "兩人命格相容性、緣分深度解析 + 1 次追問", "color": "#888888", "size": "xs", "wrap": True},
                 {"type": "separator"},
-                {"type": "text", "text": "📅 流年運勢　NT$1,000", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
+                {"type": "text", "text": "📅 流年運勢　NT$200", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
                 {"type": "text", "text": "本年度完整運勢報告 + 1 次追問", "color": "#888888", "size": "xs", "wrap": True},
                 {"type": "separator"},
-                {"type": "text", "text": "⭐ 紫微斗數　NT$2,000", "color": "#B8860B", "weight": "bold", "size": "sm"},
+                {"type": "text", "text": "⭐ 紫微斗數　NT$450", "color": "#B8860B", "weight": "bold", "size": "sm"},
                 {"type": "text", "text": "命宮主星、六大宮位深度解析 + 2 次追問", "color": "#888888", "size": "xs", "wrap": True},
             ]
         },
@@ -2265,11 +2268,11 @@ def build_tianbook_flex():
             "type": "box", "layout": "vertical", "spacing": "sm",
             "contents": [
                 {"type": "button", "style": "primary", "color": "#6B4FA0",
-                 "action": {"type": "message", "label": "💑 雙人合盤 NT$1,500", "text": "購買雙人合盤"}},
+                 "action": {"type": "message", "label": "💑 雙人合盤 NT$300", "text": "購買雙人合盤"}},
                 {"type": "button", "style": "primary", "color": "#4A3080",
-                 "action": {"type": "message", "label": "📅 流年運勢 NT$1,000", "text": "購買流年運勢"}},
+                 "action": {"type": "message", "label": "📅 流年運勢 NT$200", "text": "購買流年運勢"}},
                 {"type": "button", "style": "primary", "color": "#2D1B69",
-                 "action": {"type": "message", "label": "⭐ 紫微斗數 NT$2,000", "text": "購買紫微斗數"}}
+                 "action": {"type": "message", "label": "⭐ 紫微斗數 NT$450", "text": "購買紫微斗數"}}
             ]
         }
     }
@@ -3371,15 +3374,15 @@ def handle_message(event):
                         "💔 復合分析｜塔羅解讀\n\n"
                         "老師將為您抽牌解讀感情狀況 🃏\n\n"
                         "📝 請描述您的感情狀況或想問的問題\n\n"
-                        f"💎 本服務共可提問 {FOLLOW_UP_LIMITS['love_reading']} 次，每次 NT$150"
+                        f"💎 本服務共可提問 {FOLLOW_UP_LIMITS['love_reading']} 次，每次 NT$100"
                     ))]
                 ))
             return
         try:
-            order_id = create_order(line_user_id, "love_reading", 150)
+            order_id = create_order(line_user_id, "love_reading", 100)
             pay_url = f"{RENDER_URL}/pay/go/{order_id}"
             reply_text = (
-                f"💔 復合分析　NT$150／題\n\n"
+                f"💔 復合分析　NT$100／題\n\n"
                 f"請點以下連結完成付款：\n{pay_url}\n\n付款完成後老師會立即引導您開始 🌟"
             )
         except Exception as e:
@@ -3409,9 +3412,9 @@ def handle_message(event):
                 ))
             return
         try:
-            order_id = create_order(line_user_id, "career", 800)
+            order_id = create_order(line_user_id, "career", 150)
             pay_url = f"{RENDER_URL}/pay/go/{order_id}"
-            reply_text = f"💼 職場運勢　NT$800\n\n請點以下連結完成付款：\n{pay_url}\n\n付款完成後老師會立即引導您開始 🌟"
+            reply_text = f"💼 職場運勢　NT$150\n\n請點以下連結完成付款：\n{pay_url}\n\n付款完成後老師會立即引導您開始 🌟"
         except Exception as e:
             reply_text = "✨ 付款連結建立失敗，請稍後再試 🙏"
         with ApiClient(configuration) as api_client:
@@ -3438,9 +3441,9 @@ def handle_message(event):
                 ))
             return
         try:
-            order_id = create_order(line_user_id, "wealth", 500)
+            order_id = create_order(line_user_id, "wealth", 150)
             pay_url = f"{RENDER_URL}/pay/go/{order_id}"
-            reply_text = f"💰 財運分析　NT$500\n\n請點以下連結完成付款：\n{pay_url}\n\n付款完成後老師會立即引導您開始 🌟"
+            reply_text = f"💰 財運分析　NT$150\n\n請點以下連結完成付款：\n{pay_url}\n\n付款完成後老師會立即引導您開始 🌟"
         except Exception as e:
             reply_text = "✨ 付款連結建立失敗，請稍後再試 🙏"
         with ApiClient(configuration) as api_client:
@@ -3601,9 +3604,9 @@ def handle_message(event):
                 ))
             return
         try:
-            order_id = create_order(line_user_id, "double_chart", 1500)
+            order_id = create_order(line_user_id, "double_chart", 300)
             pay_url = f"{RENDER_URL}/pay/go/{order_id}"
-            reply_text = f"💑 雙人合盤解析　NT$1,500\n\n請點以下連結完成付款：\n{pay_url}\n\n付款完成後老師會立即引導您開始 🌟"
+            reply_text = f"💑 雙人合盤解析　NT$300\n\n請點以下連結完成付款：\n{pay_url}\n\n付款完成後老師會立即引導您開始 🌟"
         except Exception as e:
             reply_text = "✨ 付款連結建立失敗，請稍後再試 🙏"
         with ApiClient(configuration) as api_client:
@@ -3630,9 +3633,9 @@ def handle_message(event):
                 ))
             return
         try:
-            order_id = create_order(line_user_id, "year_fortune", 1000)
+            order_id = create_order(line_user_id, "year_fortune", 200)
             pay_url = f"{RENDER_URL}/pay/go/{order_id}"
-            reply_text = f"📅 流年運勢報告　NT$1,000\n\n請點以下連結完成付款：\n{pay_url}\n\n付款完成後老師會立即引導您開始 🌟"
+            reply_text = f"📅 流年運勢報告　NT$200\n\n請點以下連結完成付款：\n{pay_url}\n\n付款完成後老師會立即引導您開始 🌟"
         except Exception as e:
             reply_text = "✨ 付款連結建立失敗，請稍後再試 🙏"
         with ApiClient(configuration) as api_client:
@@ -3659,9 +3662,9 @@ def handle_message(event):
                 ))
             return
         try:
-            order_id = create_order(line_user_id, "ziwei", 2000)
+            order_id = create_order(line_user_id, "ziwei", 450)
             pay_url = f"{RENDER_URL}/pay/go/{order_id}"
-            reply_text = f"⭐ 紫微斗數命盤　NT$2,000\n\n請點以下連結完成付款：\n{pay_url}\n\n付款完成後老師會立即引導您開始 🌟"
+            reply_text = f"⭐ 紫微斗數命盤　NT$450\n\n請點以下連結完成付款：\n{pay_url}\n\n付款完成後老師會立即引導您開始 🌟"
         except Exception as e:
             reply_text = "✨ 付款連結建立失敗，請稍後再試 🙏"
         with ApiClient(configuration) as api_client:
@@ -3681,9 +3684,9 @@ def handle_message(event):
 
     elif user_msg in ["購買星塵入門包", "購買月光超值包", "購買星河豪華包"]:
         pkg_map = {
-            "購買星塵入門包": {"amount": 500,  "tokens": 3,  "name": "星塵入門包", "label": "✨ 星塵入門包"},
-            "購買月光超值包": {"amount": 1200, "tokens": 8,  "name": "月光超值包", "label": "🌙 月光超值包"},
-            "購買星河豪華包": {"amount": 2000, "tokens": 15, "name": "星河豪華包", "label": "🌌 星河豪華包"},
+            "購買星塵入門包": {"amount": 150,  "tokens": 3,  "name": "星塵入門包", "label": "✨ 星塵入門包"},
+            "購買月光超值包": {"amount": 360,  "tokens": 8,  "name": "月光超值包", "label": "🌙 月光超值包"},
+            "購買星河豪華包": {"amount": 600,  "tokens": 15, "name": "星河豪華包", "label": "🌌 星河豪華包"},
         }
         pkg = pkg_map[user_msg]
         try:
@@ -4247,9 +4250,7 @@ def handle_postback(event):
             ))
         return
 
-    # ★ 修改二：追問按鈕驗證（防舊卡片 + 防超限）
     elif data.startswith("follow_up_"):
-        # 解析 service_type 與卡片上記錄的 expected_count
         parts = data.replace("follow_up_", "").rsplit("_", 1)
         if len(parts) == 2 and parts[1].isdigit():
             service_type = parts[0]
@@ -4270,7 +4271,6 @@ def handle_postback(event):
         current_count = svc.get("follow_up_count") or 0
         limit = FOLLOW_UP_LIMITS.get(service_type, 0)
 
-        # ★ 硬性驗證：次數已達上限
         if current_count >= limit:
             try:
                 supabase.table("services").update({
@@ -4285,7 +4285,6 @@ def handle_postback(event):
                 ))
             return
 
-        # ★ 防舊卡片：比對卡片上的次數與資料庫是否一致
         if expected_count is not None and current_count != expected_count:
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest(
@@ -4316,7 +4315,6 @@ def handle_postback(event):
             ))
         return
 
-    # ★ 結束服務按鈕
     elif data.startswith("end_service_"):
         service_type = data.replace("end_service_", "")
         pending_state.pop(line_user_id, None)
