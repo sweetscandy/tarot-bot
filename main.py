@@ -445,6 +445,47 @@ def increment_follow_up(service_id):
 
 
 # ══════════════════════════════════════════
+#  ★ 新增：性別選擇 Flex
+# ══════════════════════════════════════════
+
+def build_gender_flex(context_label=""):
+    """讓用戶選擇性別，context_label 用於標記是哪個服務的性別選擇"""
+    flex_content = {
+        "type": "bubble",
+        "styles": {"header": {"backgroundColor": "#2D1B69"}, "body": {"backgroundColor": "#F8F4FF"}},
+        "header": {
+            "type": "box", "layout": "vertical",
+            "contents": [
+                {"type": "text", "text": "🌟 請選擇您的性別", "color": "#FFFFFF", "weight": "bold", "size": "lg"},
+                {"type": "text", "text": "性別影響八字十神解讀，讓老師給您更精準的分析 ✨",
+                 "color": "#C9B8FF", "size": "xs", "wrap": True}
+            ]
+        },
+        "body": {
+            "type": "box", "layout": "vertical", "spacing": "sm",
+            "contents": [
+                {"type": "text", "text": "八字命理中，男女命格的解讀方式不同 🌙",
+                 "color": "#666666", "size": "sm", "wrap": True},
+            ]
+        },
+        "footer": {
+            "type": "box", "layout": "horizontal", "spacing": "sm",
+            "contents": [
+                {
+                    "type": "button", "style": "primary", "color": "#6B4FA0", "flex": 1,
+                    "action": {"type": "postback", "label": "👨 男性", "data": f"gender_M_{context_label}"}
+                },
+                {
+                    "type": "button", "style": "primary", "color": "#C06080", "flex": 1,
+                    "action": {"type": "postback", "label": "👩 女性", "data": f"gender_F_{context_label}"}
+                }
+            ]
+        }
+    }
+    return FlexMessage(alt_text="請選擇您的性別", contents=FlexContainer.from_dict(flex_content))
+
+
+# ══════════════════════════════════════════
 #  付款開通共用函式
 # ══════════════════════════════════════════
 
@@ -973,7 +1014,7 @@ def _run_spiritual_background(line_user_id, data, zodiac):
             supabase.table("tarot_logs").insert({
                 "line_user_id": line_user_id,
                 "card_name": "靈性占卜",
-                 "reading": response_text,
+                "reading": response_text,
                 "category": "靈性占卜",
                 "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
             }).execute()
@@ -1117,7 +1158,7 @@ def _run_love_reading_background(line_user_id, situation, question_num, service_
 
 
 # ══════════════════════════════════════════
-#  職場運勢核心（背景執行）
+#  ★ 職場運勢核心（加入性別 + 時辰）
 # ══════════════════════════════════════════
 
 def _run_career_background(line_user_id, data, service_id):
@@ -1126,19 +1167,30 @@ def _run_career_background(line_user_id, data, service_id):
 
         birth = data.get("birth", "未知")
         question = data.get("question", "")
+        gender = data.get("gender", "")
+        shichen = data.get("shichen", "不知道時辰")
         zodiac = get_zodiac(birth) or "未知"
         follow_up_num = data.get("follow_up_num", 1)
 
+        gender_hint = ""
+        if gender == "M":
+            gender_hint = "性別：男性\n（男命以官殺論事業壓力，以財星論工作成果）\n"
+        elif gender == "F":
+            gender_hint = "性別：女性\n（女命以官殺論伴侶與職場，以食傷論才華表現）\n"
+
+        shichen_hint = f"出生時辰：{shichen}\n" if shichen != "不知道時辰" else "出生時辰：未知（以日主強弱為主要判斷依據）\n"
+
         user_prompt = f"""請進行職場運勢八字解析：
 使用者生辰：{birth}（{zodiac}）
-職場問題：{question}
+{gender_hint}{shichen_hint}職場問題：{question}
 這是第 {follow_up_num} 次解讀
 
 請給出約350字的職場運勢八字解析，包含：
-- 命格中的事業特質
-- 近期職場運勢走向
-- 針對問題的具體建議
-- 貴人方位與時機提示
+1. 先判斷日主天干，身強或身弱
+2. 命格中的事業特質與才能方向
+3. 近期職場運勢走向（結合當前流年）
+4. 針對問題「{question}」的具體建議
+5. 貴人方位與出現時機提示
 語氣溫柔神秘，像一位有智慧的命理師。"""
 
         chat_completion = groq_client.chat.completions.create(
@@ -1189,7 +1241,7 @@ def _run_career_background(line_user_id, data, service_id):
 
 
 # ══════════════════════════════════════════
-#  財運分析核心（背景執行）
+#  ★ 財運分析核心（加入性別 + 時辰）
 # ══════════════════════════════════════════
 
 def _run_wealth_background(line_user_id, data, service_id):
@@ -1198,21 +1250,32 @@ def _run_wealth_background(line_user_id, data, service_id):
 
         birth = data.get("birth", "未知")
         question = data.get("question", "")
+        gender = data.get("gender", "")
+        shichen = data.get("shichen", "不知道時辰")
         zodiac = get_zodiac(birth) or "未知"
         hexagram = random.choice(ICHING_HEXAGRAMS)
         follow_up_num = data.get("follow_up_num", 1)
 
+        gender_hint = ""
+        if gender == "M":
+            gender_hint = "性別：男性\n（男命以財星論財富，正財為薪資，偏財為意外之財）\n"
+        elif gender == "F":
+            gender_hint = "性別：女性\n（女命以財星論財富，同時參考食傷生財的能力）\n"
+
+        shichen_hint = f"出生時辰：{shichen}\n" if shichen != "不知道時辰" else "出生時辰：未知（以日主與財星關係為主要判斷依據）\n"
+
         user_prompt = f"""請進行財運分析易經解讀：
 使用者生辰：{birth}（{zodiac}）
+{gender_hint}{shichen_hint}起卦得：{hexagram}
 財運問題：{question}
-起卦得：{hexagram}
 這是第 {follow_up_num} 次解讀
 
 請給出約350字的財運易經解析，包含：
-- 卦象對財運的啟示
-- 近期財運走向
-- 投資／理財建議
-- 需要注意的財務風險
+1. 卦象對財運的啟示
+2. 近期財運走向（正財與偏財分別說明）
+3. 投資／理財建議
+4. 需要注意的財務風險
+5. 最佳行動時機提示
 語氣溫柔神秘，像一位有智慧的命理師。"""
 
         chat_completion = groq_client.chat.completions.create(
@@ -1263,7 +1326,7 @@ def _run_wealth_background(line_user_id, data, service_id):
 
 
 # ══════════════════════════════════════════
-#  天書服務核心（背景執行）
+#  ★ 天書服務核心（加入性別 + 時辰）
 # ══════════════════════════════════════════
 
 def _run_double_chart_background(line_user_id, data, service_id):
@@ -1272,18 +1335,28 @@ def _run_double_chart_background(line_user_id, data, service_id):
 
         birth1 = data.get("birth1", "未知")
         birth2 = data.get("birth2", "未知")
+        gender1 = data.get("gender1", "")
+        gender2 = data.get("gender2", "")
+        shichen1 = data.get("shichen1", "不知道時辰")
+        shichen2 = data.get("shichen2", "不知道時辰")
         zodiac1 = get_zodiac(birth1) or "未知"
         zodiac2 = get_zodiac(birth2) or "未知"
 
+        gender1_text = "男性" if gender1 == "M" else "女性" if gender1 == "F" else "未知"
+        gender2_text = "男性" if gender2 == "M" else "女性" if gender2 == "F" else "未知"
+        shichen1_hint = shichen1 if shichen1 != "不知道時辰" else "未知"
+        shichen2_hint = shichen2 if shichen2 != "不知道時辰" else "未知"
+
         user_prompt = f"""請進行雙人合盤解析：
-甲方生辰：{birth1}（{zodiac1}）
-乙方生辰：{birth2}（{zodiac2}）
+甲方生辰：{birth1}（{zodiac1}）｜性別：{gender1_text}｜時辰：{shichen1_hint}
+乙方生辰：{birth2}（{zodiac2}）｜性別：{gender2_text}｜時辰：{shichen2_hint}
 
 請給出約500字的深度合盤解讀，包含：
-- 兩人的命格特質與相容性
-- 感情/緣分分析
-- 相處模式建議
-- 未來發展走向
+1. 兩人日主天干分析，各自身強身弱
+2. 命格特質與相容性（五行互補或相剋）
+3. 感情宮位與緣分深度分析
+4. 兩人相處模式與建議
+5. 未來發展走向與最佳相處之道
 語氣溫柔神秘，像一位有智慧的命理師。"""
 
         chat_completion = groq_client.chat.completions.create(
@@ -1322,21 +1395,32 @@ def _run_year_fortune_background(line_user_id, data, service_id):
         time.sleep(random.uniform(720, 1080))
 
         birth = data.get("birth", "未知")
+        gender = data.get("gender", "")
+        shichen = data.get("shichen", "不知道時辰")
         zodiac = get_zodiac(birth) or "未知"
         tz = pytz.timezone("Asia/Taipei")
         current_year = datetime.datetime.now(tz).year
 
+        gender_hint = ""
+        if gender == "M":
+            gender_hint = "性別：男性\n（男命以官殺論事業壓力與社會地位，以財星論財富）\n"
+        elif gender == "F":
+            gender_hint = "性別：女性\n（女命以官殺論伴侶與職場，以食傷論才華與子女）\n"
+
+        shichen_hint = f"出生時辰：{shichen}\n" if shichen != "不知道時辰" else "出生時辰：未知（以日主為核心推算）\n"
+
         user_prompt = f"""請進行流年運勢解析：
 使用者生辰：{birth}（{zodiac}）
-解析年份：{current_year} 年
+{gender_hint}{shichen_hint}解析年份：{current_year} 年
 
 請給出約500字的流年運勢報告，包含：
-- {current_year} 年整體運勢走向
-- 感情運
-- 事業財運
-- 健康運
-- 每季重點提示
-- 開運建議
+1. {current_year} 年流年天干地支與命主的互動關係
+2. 整體運勢走向（吉凶分析）
+3. 感情運（依性別給出針對性解讀）
+4. 事業財運
+5. 健康運
+6. 每季重點提示（春夏秋冬各一句）
+7. 開運建議與注意事項
 語氣溫柔神秘，像一位有智慧的命理師。"""
 
         chat_completion = groq_client.chat.completions.create(
@@ -1376,20 +1460,27 @@ def _run_ziwei_background(line_user_id, data, service_id):
 
         birth = data.get("birth", "未知")
         shichen = data.get("shichen", "不知道時辰")
+        gender = data.get("gender", "")
         zodiac = get_zodiac(birth) or "未知"
-        shichen_hint = f"出生時辰：{shichen}" if shichen != "不知道時辰" else "出生時辰：未知（將以主要格局推算）"
+        shichen_hint = f"出生時辰：{shichen}" if shichen != "不知道時辰" else "出生時辰：未知（將以主要格局推算，命宮以太陽時推估）"
+
+        gender_hint = ""
+        if gender == "M":
+            gender_hint = "性別：男性\n（紫微男命重事業宮、財帛宮，官祿宮為核心）\n"
+        elif gender == "F":
+            gender_hint = "性別：女性\n（紫微女命重夫妻宮、子女宮，感情宮位為核心）\n"
 
         user_prompt = f"""請進行紫微斗數命盤解析：
 使用者生辰：{birth}（{zodiac}）
-{shichen_hint}
+{gender_hint}{shichen_hint}
 
 請給出約500字的紫微斗數命盤解讀，包含：
-- 命宮主星分析
-- 個人命格特質
-- 事業宮解析
-- 感情宮解析
-- 財帛宮解析
-- 近期流年重點
+1. 命宮主星分析（推算主星並說明特質）
+2. 個人命格特質與人生主軸
+3. 事業宮解析（適合的職業方向）
+4. 感情宮解析（依性別給出針對性解讀）
+5. 財帛宮解析（財運特質與理財建議）
+6. 近期流年重點（當前大限與流年互動）
 語氣溫柔神秘，像一位有智慧的紫微命理師。"""
 
         chat_completion = groq_client.chat.completions.create(
@@ -2015,7 +2106,6 @@ def build_life_navigation_flex():
         "body": {
             "type": "box", "layout": "vertical", "spacing": "sm",
             "contents": [
-                # ★ 已更新價格
                 {"type": "text", "text": "💔 復合分析　NT$100／題，上限 5 題", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
                 {"type": "text", "text": "塔羅牌解讀，每題抽一張牌，最多追問 5 次", "color": "#888888", "size": "xs", "wrap": True},
                 {"type": "separator"},
@@ -2029,7 +2119,6 @@ def build_life_navigation_flex():
         "footer": {
             "type": "box", "layout": "vertical", "spacing": "sm",
             "contents": [
-                # ★ 已更新按鈕文字
                 {"type": "button", "style": "primary", "color": "#6B4FA0",
                  "action": {"type": "message", "label": "💔 復合分析 NT$100／題", "text": "復合分析"}},
                 {"type": "button", "style": "primary", "color": "#4A3080",
@@ -2076,8 +2165,7 @@ def build_fortune_stick_category_flex():
             ]
         }
     }
-    return FlexMessage(alt_text="求籤問卜 - 選擇類別", contents=
-FlexContainer.from_dict(flex_content))
+    return FlexMessage(alt_text="求籤問卜 - 選擇類別", contents=FlexContainer.from_dict(flex_content))
 
 
 def build_fortune_stick_question_flex(category):
@@ -2208,7 +2296,6 @@ def build_token_shop_flex():
         "body": {
             "type": "box", "layout": "vertical", "spacing": "sm",
             "contents": [
-                # ★ 已更新價格
                 {"type": "text", "text": "✨ 星塵入門包　$150 → 3 顆", "color": "#6B4FA0", "weight": "bold", "size": "sm"},
                 {"type": "text", "text": "踏入星盤的第一步，命運從這裡開始轉動", "color": "#888888", "size": "xs", "wrap": True},
                 {"type": "separator"},
@@ -2225,7 +2312,6 @@ def build_token_shop_flex():
         "footer": {
             "type": "box", "layout": "vertical", "spacing": "sm",
             "contents": [
-                # ★ 已更新按鈕文字
                 {"type": "button", "style": "primary", "color": "#6B4FA0",
                  "action": {"type": "message", "label": "✨ 星塵入門包 $150 → 3顆", "text": "購買星塵入門包"}},
                 {"type": "button", "style": "primary", "color": "#4A3080",
@@ -2742,6 +2828,10 @@ def handle_message(event):
 
     zodiac = get_zodiac(user.get("birth_date")) if user.get("birth_date") else None
 
+    # ══════════════════════════════════════
+    #  管理員指令
+    # ══════════════════════════════════════
+
     if line_user_id == ADMIN_USER_ID:
 
         if user_msg in ["管理員指令", "admin", "Admin"]:
@@ -2886,6 +2976,10 @@ def handle_message(event):
                         ))
             return
 
+    # ══════════════════════════════════════
+    #  pending_state 狀態機
+    # ══════════════════════════════════════
+
     if line_user_id in pending_state:
         state = pending_state[line_user_id]
         mode = state.get("mode")
@@ -2993,6 +3087,10 @@ def handle_message(event):
             do_reading_async(line_user_id, user_msg, reading_type, False, zodiac, user)
             return
 
+        # ══════════════════════════════════════
+        #  ★ 雙人合盤（加入性別 + 時辰）
+        # ══════════════════════════════════════
+
         elif mode == "double_chart":
             data = state.get("data", {})
             if step == "birth1":
@@ -3011,17 +3109,17 @@ def handle_message(event):
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(ReplyMessageRequest(
                         reply_token=event.reply_token,
-                        messages=[build_confirm_birth_flex(parsed, label="甲方生辰", next_step_hint="確認後繼續輸入乙方生辰")]
+                        messages=[build_confirm_birth_flex(parsed, label="甲方生辰", next_step_hint="確認後選擇甲方性別")]
                     ))
                 return
             elif step == "birth1_confirm":
                 if user_msg in ["確認", "是", "對", "正確"]:
-                    state["step"] = "birth2"
+                    state["step"] = "gender1"
                     pending_state[line_user_id] = state
                     with ApiClient(configuration) as api_client:
                         MessagingApi(api_client).reply_message(ReplyMessageRequest(
                             reply_token=event.reply_token,
-                            messages=[TextMessage(text=f"✅ 甲方生辰確認：{data['birth1']}\n\n請輸入乙方出生日期 🌙\n\n📅 格式：1990-05-20")]
+                            messages=[build_gender_flex("double_chart_1")]
                         ))
                 elif user_msg in ["重填", "重新", "不對", "錯了"]:
                     state["step"] = "birth1"
@@ -3031,6 +3129,20 @@ def handle_message(event):
                             reply_token=event.reply_token,
                             messages=[TextMessage(text="請重新輸入甲方出生日期：\n\n📅 格式：1990-05-20")]
                         ))
+                return
+            elif step == "gender1":
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="請點選上方按鈕選擇甲方性別 🌙")]
+                    ))
+                return
+            elif step == "shichen1":
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="請點選上方按鈕選擇甲方出生時辰 🌙")]
+                    ))
                 return
             elif step == "birth2":
                 parsed = parse_birth_input(user_msg)
@@ -3048,22 +3160,18 @@ def handle_message(event):
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(ReplyMessageRequest(
                         reply_token=event.reply_token,
-                        messages=[build_confirm_birth_flex(parsed, label="乙方生辰", next_step_hint="確認後開始解析合盤")]
+                        messages=[build_confirm_birth_flex(parsed, label="乙方生辰", next_step_hint="確認後選擇乙方性別")]
                     ))
                 return
             elif step == "birth2_confirm":
                 if user_msg in ["確認", "是", "對", "正確"]:
-                    service_id = state.get("service_id")
-                    data_copy = data.copy()
-                    pending_state.pop(line_user_id, None)
-                    wait_msg = random.choice(WAITING_MSGS_TIANBOOK)
+                    state["step"] = "gender2"
+                    pending_state[line_user_id] = state
                     with ApiClient(configuration) as api_client:
                         MessagingApi(api_client).reply_message(ReplyMessageRequest(
                             reply_token=event.reply_token,
-                            messages=[TextMessage(text=wait_msg)]
+                            messages=[build_gender_flex("double_chart_2")]
                         ))
-                    t = threading.Thread(target=_run_double_chart_background, args=(line_user_id, data_copy, service_id), daemon=True)
-                    t.start()
                 elif user_msg in ["重填", "重新", "不對", "錯了"]:
                     state["step"] = "birth2"
                     pending_state[line_user_id] = state
@@ -3073,6 +3181,24 @@ def handle_message(event):
                             messages=[TextMessage(text="請重新輸入乙方出生日期：\n\n📅 格式：1990-05-20")]
                         ))
                 return
+            elif step == "gender2":
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="請點選上方按鈕選擇乙方性別 🌙")]
+                    ))
+                return
+            elif step == "shichen2":
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="請點選上方按鈕選擇乙方出生時辰 🌙")]
+                    ))
+                return
+
+        # ══════════════════════════════════════
+        #  ★ 流年運勢（加入性別 + 時辰）
+        # ══════════════════════════════════════
 
         elif mode == "year_fortune":
             data = state.get("data", {})
@@ -3092,22 +3218,18 @@ def handle_message(event):
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(ReplyMessageRequest(
                         reply_token=event.reply_token,
-                        messages=[build_confirm_birth_flex(parsed, label="您的生辰", next_step_hint="確認後開始解析流年運勢")]
+                        messages=[build_confirm_birth_flex(parsed, label="您的生辰", next_step_hint="確認後選擇性別")]
                     ))
                 return
             elif step == "birth_confirm":
                 if user_msg in ["確認", "是", "對", "正確"]:
-                    service_id = state.get("service_id")
-                    data_copy = data.copy()
-                    pending_state.pop(line_user_id, None)
-                    wait_msg = random.choice(WAITING_MSGS_TIANBOOK)
+                    state["step"] = "gender"
+                    pending_state[line_user_id] = state
                     with ApiClient(configuration) as api_client:
                         MessagingApi(api_client).reply_message(ReplyMessageRequest(
                             reply_token=event.reply_token,
-                            messages=[TextMessage(text=wait_msg)]
+                            messages=[build_gender_flex("year_fortune")]
                         ))
-                    t = threading.Thread(target=_run_year_fortune_background, args=(line_user_id, data_copy, service_id), daemon=True)
-                    t.start()
                 elif user_msg in ["重填", "重新", "不對", "錯了"]:
                     state["step"] = "birth"
                     pending_state[line_user_id] = state
@@ -3117,6 +3239,24 @@ def handle_message(event):
                             messages=[TextMessage(text="請重新輸入您的出生日期：\n\n📅 格式：1990-05-20")]
                         ))
                 return
+            elif step == "gender":
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="請點選上方按鈕選擇您的性別 🌙")]
+                    ))
+                return
+            elif step == "shichen":
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="請點選上方按鈕選擇您的出生時辰 🌙")]
+                    ))
+                return
+
+        # ══════════════════════════════════════
+        #  ★ 紫微斗數（原有時辰 + 加入性別）
+        # ══════════════════════════════════════
 
         elif mode == "ziwei":
             data = state.get("data", {})
@@ -3136,17 +3276,17 @@ def handle_message(event):
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(ReplyMessageRequest(
                         reply_token=event.reply_token,
-                        messages=[build_confirm_birth_flex(parsed, label="您的生辰", next_step_hint="確認後選擇出生時辰")]
+                        messages=[build_confirm_birth_flex(parsed, label="您的生辰", next_step_hint="確認後選擇性別與時辰")]
                     ))
                 return
             elif step == "birth_confirm":
                 if user_msg in ["確認", "是", "對", "正確"]:
-                    state["step"] = "shichen"
+                    state["step"] = "gender"
                     pending_state[line_user_id] = state
                     with ApiClient(configuration) as api_client:
                         MessagingApi(api_client).reply_message(ReplyMessageRequest(
                             reply_token=event.reply_token,
-                            messages=[build_shichen_flex()]
+                            messages=[build_gender_flex("ziwei")]
                         ))
                 elif user_msg in ["重填", "重新", "不對", "錯了"]:
                     state["step"] = "birth"
@@ -3156,6 +3296,13 @@ def handle_message(event):
                             reply_token=event.reply_token,
                             messages=[TextMessage(text="請重新輸入您的出生日期：\n\n📅 格式：1990-05-20")]
                         ))
+                return
+            elif step == "gender":
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="請點選上方按鈕選擇您的性別 🌙")]
+                    ))
                 return
             elif step == "shichen":
                 with ApiClient(configuration) as api_client:
@@ -3194,6 +3341,10 @@ def handle_message(event):
                     }
                 return
 
+        # ══════════════════════════════════════
+        #  ★ 職場運勢（加入性別 + 時辰）
+        # ══════════════════════════════════════
+
         elif mode == "career":
             data = state.get("data", {})
             if step == "birth":
@@ -3212,17 +3363,17 @@ def handle_message(event):
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(ReplyMessageRequest(
                         reply_token=event.reply_token,
-                        messages=[build_confirm_birth_flex(parsed, label="您的生辰", next_step_hint="確認後描述職場問題")]
+                        messages=[build_confirm_birth_flex(parsed, label="您的生辰", next_step_hint="確認後選擇性別")]
                     ))
                 return
             elif step == "birth_confirm":
                 if user_msg in ["確認", "是", "對", "正確"]:
-                    state["step"] = "question"
+                    state["step"] = "gender"
                     pending_state[line_user_id] = state
                     with ApiClient(configuration) as api_client:
                         MessagingApi(api_client).reply_message(ReplyMessageRequest(
                             reply_token=event.reply_token,
-                            messages=[TextMessage(text=f"✅ 生辰確認：{data['birth']}\n\n💼 請描述您的職場困境或想了解的方向\n\n例如：轉職時機、升遷機會、職場人際...")]
+                            messages=[build_gender_flex("career")]
                         ))
                 elif user_msg in ["重填", "重新", "不對", "錯了"]:
                     state["step"] = "birth"
@@ -3232,6 +3383,20 @@ def handle_message(event):
                             reply_token=event.reply_token,
                             messages=[TextMessage(text="請重新輸入您的出生日期：\n\n📅 格式：1990-05-20")]
                         ))
+                return
+            elif step == "gender":
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="請點選上方按鈕選擇您的性別 🌙")]
+                    ))
+                return
+            elif step == "shichen":
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="請點選上方按鈕選擇您的出生時辰 🌙")]
+                    ))
                 return
             elif step == "question":
                 service_id = state.get("service_id")
@@ -3273,6 +3438,10 @@ def handle_message(event):
                 t.start()
                 return
 
+        # ══════════════════════════════════════
+        #  ★ 財運分析（加入性別 + 時辰）
+        # ══════════════════════════════════════
+
         elif mode == "wealth":
             data = state.get("data", {})
             if step == "birth":
@@ -3291,17 +3460,17 @@ def handle_message(event):
                 with ApiClient(configuration) as api_client:
                     MessagingApi(api_client).reply_message(ReplyMessageRequest(
                         reply_token=event.reply_token,
-                        messages=[build_confirm_birth_flex(parsed, label="您的生辰", next_step_hint="確認後描述財運問題")]
+                        messages=[build_confirm_birth_flex(parsed, label="您的生辰", next_step_hint="確認後選擇性別")]
                     ))
                 return
             elif step == "birth_confirm":
                 if user_msg in ["確認", "是", "對", "正確"]:
-                    state["step"] = "question"
+                    state["step"] = "gender"
                     pending_state[line_user_id] = state
                     with ApiClient(configuration) as api_client:
                         MessagingApi(api_client).reply_message(ReplyMessageRequest(
                             reply_token=event.reply_token,
-                            messages=[TextMessage(text=f"✅ 生辰確認：{data['birth']}\n\n💰 請描述您的財運困境或想了解的方向\n\n例如：投資時機、偏財運、財務規劃...")]
+                            messages=[build_gender_flex("wealth")]
                         ))
                 elif user_msg in ["重填", "重新", "不對", "錯了"]:
                     state["step"] = "birth"
@@ -3311,6 +3480,20 @@ def handle_message(event):
                             reply_token=event.reply_token,
                             messages=[TextMessage(text="請重新輸入您的出生日期：\n\n📅 格式：1990-05-20")]
                         ))
+                return
+            elif step == "gender":
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="請點選上方按鈕選擇您的性別 🌙")]
+                    ))
+                return
+            elif step == "shichen":
+                with ApiClient(configuration) as api_client:
+                    MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                        reply_token=event.reply_token,
+                        messages=[TextMessage(text="請點選上方按鈕選擇您的出生時辰 🌙")]
+                    ))
                 return
             elif step == "question":
                 service_id = state.get("service_id")
@@ -3657,7 +3840,7 @@ def handle_message(event):
                     reply_token=event.reply_token,
                     messages=[TextMessage(text=(
                         "⭐ 紫微斗數命盤解析\n\n"
-                        "請輸入您的出生日期：\n\n格式範例：1990-05-20\n\n⚠️ 請使用西元國曆（陽曆）\n下一步將請您選擇出生時辰"
+                        "請輸入您的出生日期：\n\n格式範例：1990-05-20\n\n⚠️ 請使用西元國曆（陽曆）\n下一步將請您選擇性別與出生時辰"
                     ))]
                 ))
             return
@@ -3860,7 +4043,7 @@ def handle_message(event):
 
 
 # ══════════════════════════════════════════
-#  Postback 事件處理
+#  ★ Postback 事件處理（加入 gender_ 處理）
 # ══════════════════════════════════════════
 
 @handler.add(PostbackEvent)
@@ -3869,6 +4052,75 @@ def handle_postback(event):
     data = event.postback.data
     user = get_or_create_user(line_user_id)
     zodiac = get_zodiac(user.get("birth_date")) if user.get("birth_date") else None
+
+    # ══════════════════════════════════════
+    #  ★ 性別選擇處理（所有服務共用）
+    # ══════════════════════════════════════
+
+    if data.startswith("gender_"):
+        # data 格式：gender_M_career / gender_F_ziwei / gender_M_double_chart_1 等
+        parts = data.split("_", 2)  # ["gender", "M/F", "context"]
+        if len(parts) < 3:
+            return
+        gender_val = parts[1]   # "M" or "F"
+        context    = parts[2]   # "career" / "wealth" / "year_fortune" / "ziwei" / "double_chart_1" / "double_chart_2"
+
+        if line_user_id not in pending_state:
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text="⚠️ 狀態已過期，請重新開始 🙏")]
+                ))
+            return
+
+        state = pending_state[line_user_id]
+        mode  = state.get("mode")
+        d     = state.get("data", {})
+
+        gender_label = "男性 👨" if gender_val == "M" else "女性 👩"
+
+        if context == "double_chart_1":
+            d["gender1"] = gender_val
+            state["data"] = d
+            state["step"] = "shichen1"
+            pending_state[line_user_id] = state
+            # 顯示時辰選擇，用特殊 context 標記是甲方
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=f"✅ 甲方性別：{gender_label}\n\n請選擇甲方的出生時辰 🌙"),
+                               build_shichen_flex()]
+                ))
+
+        elif context == "double_chart_2":
+            d["gender2"] = gender_val
+            state["data"] = d
+            state["step"] = "shichen2"
+            pending_state[line_user_id] = state
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=f"✅ 乙方性別：{gender_label}\n\n請選擇乙方的出生時辰 🌙"),
+                               build_shichen_flex()]
+                ))
+
+        else:
+            # career / wealth / year_fortune / ziwei
+            d["gender"] = gender_val
+            state["data"] = d
+            state["step"] = "shichen"
+            pending_state[line_user_id] = state
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=f"✅ 性別：{gender_label}\n\n請選擇您的出生時辰 🌙"),
+                               build_shichen_flex()]
+                ))
+        return
+
+    # ══════════════════════════════════════
+    #  生辰綁定
+    # ══════════════════════════════════════
 
     if data == "bind_birth":
         selected_date = event.postback.params.get("date")
@@ -3916,71 +4168,65 @@ def handle_postback(event):
                     messages=[TextMessage(text="⚠️ 狀態已過期，請重新開始 🙏")]
                 ))
             return
-        state = pending_state[line_user_id]
-        mode  = state.get("mode")
-        step  = state.get("step")
+        state     = pending_state[line_user_id]
+        mode      = state.get("mode")
+        step      = state.get("step")
         data_dict = state.get("data", {})
 
         if step == "birth1_confirm":
-            state["step"] = "birth2"
+            # 雙人合盤：甲方確認 → 選性別
+            state["step"] = "gender1"
             pending_state[line_user_id] = state
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[TextMessage(text=f"✅ 甲方生辰確認：{confirmed_date}\n\n請輸入乙方（另一人）的出生日期 🌙\n\n📅 格式：1990-05-20")]
+                    messages=[build_gender_flex("double_chart_1")]
                 ))
 
         elif step == "birth2_confirm":
-            service_id = state.get("service_id")
-            data_copy = data_dict.copy()
-            pending_state.pop(line_user_id, None)
-            wait_msg = random.choice(WAITING_MSGS_TIANBOOK)
-            with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[TextMessage(text=wait_msg)]
-                ))
-            t = threading.Thread(target=_run_double_chart_background, args=(line_user_id, data_copy, service_id), daemon=True)
-            t.start()
-
-        elif step == "birth_confirm" and mode == "year_fortune":
-            service_id = state.get("service_id")
-            data_copy = data_dict.copy()
-            pending_state.pop(line_user_id, None)
-            wait_msg = random.choice(WAITING_MSGS_TIANBOOK)
-            with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[TextMessage(text=wait_msg)]
-                ))
-            t = threading.Thread(target=_run_year_fortune_background, args=(line_user_id, data_copy, service_id), daemon=True)
-            t.start()
-
-        elif step == "birth_confirm" and mode == "ziwei":
-            state["step"] = "shichen"
+            # 雙人合盤：乙方確認 → 選性別
+            state["step"] = "gender2"
             pending_state[line_user_id] = state
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[build_shichen_flex()]
+                    messages=[build_gender_flex("double_chart_2")]
+                ))
+
+        elif step == "birth_confirm" and mode == "year_fortune":
+            state["step"] = "gender"
+            pending_state[line_user_id] = state
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[build_gender_flex("year_fortune")]
+                ))
+
+        elif step == "birth_confirm" and mode == "ziwei":
+            state["step"] = "gender"
+            pending_state[line_user_id] = state
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[build_gender_flex("ziwei")]
                 ))
 
         elif step == "birth_confirm" and mode == "career":
-            state["step"] = "question"
+            state["step"] = "gender"
             pending_state[line_user_id] = state
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[TextMessage(text=f"✅ 生辰確認：{confirmed_date}\n\n💼 請描述您的職場困境或想了解的方向\n\n例如：轉職時機、升遷機會、職場人際...")]
+                    messages=[build_gender_flex("career")]
                 ))
 
         elif step == "birth_confirm" and mode == "wealth":
-            state["step"] = "question"
+            state["step"] = "gender"
             pending_state[line_user_id] = state
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[TextMessage(text=f"✅ 生辰確認：{confirmed_date}\n\n💰 請描述您的財運困境或想了解的方向\n\n例如：投資時機、偏財運、財務規劃...")]
+                    messages=[build_gender_flex("wealth")]
                 ))
         return
 
@@ -4221,33 +4467,132 @@ def handle_postback(event):
         t.start()
         return
 
+    # ══════════════════════════════════════
+    #  ★ 時辰選擇（所有服務共用，依 mode 分流）
+    # ══════════════════════════════════════
+
     elif data.startswith("shichen_"):
         shichen = data.replace("shichen_", "")
-        if line_user_id in pending_state:
-            state = pending_state[line_user_id]
-            if state.get("mode") == "ziwei" and state.get("step") == "shichen":
-                state["data"]["shichen"] = shichen
-                service_id = state.get("service_id")
-                data_copy = state["data"].copy()
-                pending_state.pop(line_user_id, None)
-                wait_msg = random.choice(WAITING_MSGS_TIANBOOK)
-                with ApiClient(configuration) as api_client:
-                    MessagingApi(api_client).reply_message(ReplyMessageRequest(
-                        reply_token=event.reply_token,
-                        messages=[TextMessage(text=wait_msg)]
-                    ))
-                t = threading.Thread(
-                    target=_run_ziwei_background,
-                    args=(line_user_id, data_copy, service_id),
-                    daemon=True
-                )
-                t.start()
-                return
-        with ApiClient(configuration) as api_client:
-            MessagingApi(api_client).reply_message(ReplyMessageRequest(
-                reply_token=event.reply_token,
-                messages=[TextMessage(text="⚠️ 狀態已過期，請重新開始 🙏")]
-            ))
+        if line_user_id not in pending_state:
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text="⚠️ 狀態已過期，請重新開始 🙏")]
+                ))
+            return
+
+        state = pending_state[line_user_id]
+        mode  = state.get("mode")
+        step  = state.get("step")
+        d     = state.get("data", {})
+
+        shichen_label = shichen if shichen != "不知道時辰" else "不知道時辰（將以主要格局推算）"
+
+        if mode == "ziwei" and step == "shichen":
+            d["shichen"] = shichen
+            service_id = state.get("service_id")
+            data_copy = d.copy()
+            pending_state.pop(line_user_id, None)
+            wait_msg = random.choice(WAITING_MSGS_TIANBOOK)
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=f"✅ 時辰：{shichen_label}\n\n{wait_msg}")]
+                ))
+            t = threading.Thread(
+                target=_run_ziwei_background,
+                args=(line_user_id, data_copy, service_id),
+                daemon=True
+            )
+            t.start()
+
+        elif mode == "year_fortune" and step == "shichen":
+            d["shichen"] = shichen
+            service_id = state.get("service_id")
+            data_copy = d.copy()
+            pending_state.pop(line_user_id, None)
+            wait_msg = random.choice(WAITING_MSGS_TIANBOOK)
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=f"✅ 時辰：{shichen_label}\n\n{wait_msg}")]
+                ))
+            t = threading.Thread(
+                target=_run_year_fortune_background,
+                args=(line_user_id, data_copy, service_id),
+                daemon=True
+            )
+            t.start()
+
+        elif mode == "career" and step == "shichen":
+            d["shichen"] = shichen
+            state["data"] = d
+            state["step"] = "question"
+            pending_state[line_user_id] = state
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=(
+                        f"✅ 時辰：{shichen_label}\n\n"
+                        f"💼 請描述您的職場困境或想了解的方向\n\n"
+                        f"例如：轉職時機、升遷機會、職場人際..."
+                    ))]
+                ))
+
+        elif mode == "wealth" and step == "shichen":
+            d["shichen"] = shichen
+            state["data"] = d
+            state["step"] = "question"
+            pending_state[line_user_id] = state
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=(
+                        f"✅ 時辰：{shichen_label}\n\n"
+                        f"💰 請描述您的財運困境或想了解的方向\n\n"
+                        f"例如：投資時機、偏財運、財務規劃..."
+                    ))]
+                ))
+
+        elif mode == "double_chart" and step == "shichen1":
+            d["shichen1"] = shichen
+            state["data"] = d
+            state["step"] = "birth2"
+            pending_state[line_user_id] = state
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=(
+                        f"✅ 甲方時辰：{shichen_label}\n\n"
+                        f"請輸入乙方（另一人）的出生日期 🌙\n\n"
+                        f"📅 格式：1990-05-20"
+                    ))]
+                ))
+
+        elif mode == "double_chart" and step == "shichen2":
+            d["shichen2"] = shichen
+            service_id = state.get("service_id")
+            data_copy = d.copy()
+            pending_state.pop(line_user_id, None)
+            wait_msg = random.choice(WAITING_MSGS_TIANBOOK)
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text=f"✅ 乙方時辰：{shichen_label}\n\n{wait_msg}")]
+                ))
+            t = threading.Thread(
+                target=_run_double_chart_background,
+                args=(line_user_id, data_copy, service_id),
+                daemon=True
+            )
+            t.start()
+
+        else:
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text="⚠️ 狀態已過期，請重新開始 🙏")]
+                ))
         return
 
     elif data.startswith("follow_up_"):
