@@ -1180,18 +1180,42 @@ def _run_career_background(line_user_id, data, service_id):
 
         shichen_hint = f"出生時辰：{shichen}\n" if shichen != "不知道時辰" else "出生時辰：未知（以日主強弱為主要判斷依據）\n"
 
-        user_prompt = f"""請進行職場運勢八字解析：
-使用者生辰：{birth}（{zodiac}）
+        tz = pytz.timezone("Asia/Taipei")
+        current_year = datetime.datetime.now(tz).year
+        user_prompt = f"""你是一位精通四柱八字的職場命理師，請用繁體中文進行專業職場運勢解析。
+
+【命主資料】
+生辰：{birth}（{zodiac}）
 {gender_hint}{shichen_hint}職場問題：{question}
 這是第 {follow_up_num} 次解讀
 
-請給出約350字的職場運勢八字解析，包含：
-1. 先判斷日主天干，身強或身弱
-2. 命格中的事業特質與才能方向
-3. 近期職場運勢走向（結合當前流年）
-4. 針對問題「{question}」的具體建議
-5. 貴人方位與出現時機提示
-語氣溫柔神秘，像一位有智慧的命理師。"""
+【批命要求】請依序輸出以下段落，每段必須具體，禁止模糊帶過：
+
+▍一、命格職場特質
+先明確說出日主天干是什麼（如：甲木、丙火），再判斷身強或身弱，然後說明：
+- 此人天生的職場優勢（2點，要具體說出是什麼能力）
+- 此人在職場上的盲點（1點，要具體）
+- 最適合的工作類型（列出 2~3 種具體職業或產業名稱）
+
+▍二、針對您的問題「{question}」
+直接回答這個問題，給出：
+- 目前命盤是否支持這個方向（明確說支持或不支持）
+- 最佳行動時機（具體到幾月或哪個季節）
+- 一個具體的行動步驟（要可以立刻執行的）
+
+▍三、{current_year} 年職場流年
+說明今年官祿宮的流年狀況：
+- 升遷或轉職機會最大的月份（具體說出幾月）
+- 需要小心的職場人際陷阱（具體說出是什麼情況）
+- 貴人特徵（什麼樣的人、來自哪個方位）
+
+▍四、開運建議
+- 開運顏色（穿著建議，說出具體顏色）
+- 辦公桌方位建議（東南西北哪個方向）
+- 本月最重要的一個具體行動
+
+語氣溫柔神秘但直接，像命理師在給具體建議，總字數約 400 字。"""
+
 
         chat_completion = groq_client.chat.completions.create(
             messages=[
@@ -1264,19 +1288,48 @@ def _run_wealth_background(line_user_id, data, service_id):
 
         shichen_hint = f"出生時辰：{shichen}\n" if shichen != "不知道時辰" else "出生時辰：未知（以日主與財星關係為主要判斷依據）\n"
 
-        user_prompt = f"""請進行財運分析易經解讀：
-使用者生辰：{birth}（{zodiac}）
+        tz = pytz.timezone("Asia/Taipei")
+        current_year = datetime.datetime.now(tz).year
+        user_prompt = f"""你是一位精通四柱八字與易經的財運命理師，請用繁體中文進行專業財運解析。
+
+【命主資料】
+生辰：{birth}（{zodiac}）
 {gender_hint}{shichen_hint}起卦得：{hexagram}
 財運問題：{question}
 這是第 {follow_up_num} 次解讀
 
-請給出約350字的財運易經解析，包含：
-1. 卦象對財運的啟示
-2. 近期財運走向（正財與偏財分別說明）
-3. 投資／理財建議
-4. 需要注意的財務風險
-5. 最佳行動時機提示
-語氣溫柔神秘，像一位有智慧的命理師。"""
+【批命要求】請依序輸出以下段落，每段必須具體，禁止模糊帶過：
+
+▍一、命格財運特質
+先明確說出日主天干，再說明：
+- 正財星與偏財星哪個更強（要明確說出哪個強）
+- 此人天生的賺錢方式（具體說：靠技術／靠人脈／靠投資／靠創業）
+- 財庫是否穩固（容易存錢還是容易漏財，說出原因）
+
+▍二、卦象解析「{hexagram}」
+說明此卦對財運的啟示：
+- 卦象的核心訊息（1~2句，要有命理依據）
+- 對「{question}」這個問題的直接回應
+- 吉凶判斷（明確說吉或凶，給出★評分，滿分5顆）
+
+▍三、近期 3 個月財運走向
+分別說明：
+- 正財運（薪資、固定收入）走勢：具體說哪個月最旺
+- 偏財運（投資、意外之財）走勢：具體說哪個月有機會
+- 最需要避開的財務風險（具體說出是什麼風險類型）
+
+▍四、投資理財建議
+- 適合的理財方式（具體列出 2 種，說出原因）
+- 不適合的投資類型（具體列出 1 種，說明為何不適合）
+- 最佳行動時機（具體到幾月或哪個節氣）
+
+▍五、財運開運錦囊
+- 開運顏色（說出具體顏色）
+- 財位方向（東南西北哪個方位，說出原因）
+- 一句最重要的財運建議
+
+語氣溫柔神秘但直接，總字數約 400 字。"""
+
 
         chat_completion = groq_client.chat.completions.create(
             messages=[
@@ -1347,17 +1400,39 @@ def _run_double_chart_background(line_user_id, data, service_id):
         shichen1_hint = shichen1 if shichen1 != "不知道時辰" else "未知"
         shichen2_hint = shichen2 if shichen2 != "不知道時辰" else "未知"
 
-        user_prompt = f"""請進行雙人合盤解析：
-甲方生辰：{birth1}（{zodiac1}）｜性別：{gender1_text}｜時辰：{shichen1_hint}
-乙方生辰：{birth2}（{zodiac2}）｜性別：{gender2_text}｜時辰：{shichen2_hint}
+        user_prompt = f"""你是一位精通四柱八字合婚的命理師，請用繁體中文進行專業雙人合盤解析。
 
-請給出約500字的深度合盤解讀，包含：
-1. 兩人日主天干分析，各自身強身弱
-2. 命格特質與相容性（五行互補或相剋）
-3. 感情宮位與緣分深度分析
-4. 兩人相處模式與建議
-5. 未來發展走向與最佳相處之道
-語氣溫柔神秘，像一位有智慧的命理師。"""
+【甲方資料】
+生辰：{birth1}（{zodiac1}）｜性別：{gender1_text}｜時辰：{shichen1_hint}
+
+【乙方資料】
+生辰：{birth2}（{zodiac2}）｜性別：{gender2_text}｜時辰：{shichen2_hint}
+
+【批命要求】請依序輸出以下段落，每段必須具體，禁止模糊帶過：
+
+▍一、兩人命格速覽
+分別明確說出甲方與乙方的日主天干（如：甲木、丁火），各用 2 句話說明核心性格特質。
+
+▍二、五行相容性分析
+- 明確說出兩人五行的共鳴點（相生關係，說出是哪兩個五行）
+- 明確說出兩人五行的摩擦點（相剋關係，說出是哪兩個五行）
+- 整體相容度評分（用★表示，滿分5顆，必須給出分數並說明理由）
+
+▍三、感情緣分深度分析
+- 兩人的緣分類型（前世緣／今生緣，用命理角度解釋）
+- 感情最穩定的時間段（具體說出幾歲到幾歲）
+- 感情最大的考驗點（具體說出是什麼情況，幾歲前後）
+
+▍四、相處模式建議（3條）
+每條都要有「因為⋯所以建議⋯」的具體結構，不能模糊。
+
+▍五、合婚總結
+- 一句話的合婚結論（明確說適合或需要努力）
+- 今年最適合推進關係的月份（具體說出幾月，說明原因）
+- 給兩人的一句共同開運建議
+
+語氣溫柔神秘，像命理師親批，總字數約 500 字。"""
+
 
         chat_completion = groq_client.chat.completions.create(
             messages=[
@@ -1409,19 +1484,44 @@ def _run_year_fortune_background(line_user_id, data, service_id):
 
         shichen_hint = f"出生時辰：{shichen}\n" if shichen != "不知道時辰" else "出生時辰：未知（以日主為核心推算）\n"
 
-        user_prompt = f"""請進行流年運勢解析：
-使用者生辰：{birth}（{zodiac}）
+        user_prompt = f"""你是一位精通四柱八字與流年推算的命理師，請用繁體中文進行專業流年批命。
+
+【命主資料】
+生辰：{birth}（{zodiac}）
 {gender_hint}{shichen_hint}解析年份：{current_year} 年
 
-請給出約500字的流年運勢報告，包含：
-1. {current_year} 年流年天干地支與命主的互動關係
-2. 整體運勢走向（吉凶分析）
-3. 感情運（依性別給出針對性解讀）
-4. 事業財運
-5. 健康運
-6. 每季重點提示（春夏秋冬各一句）
-7. 開運建議與注意事項
-語氣溫柔神秘，像一位有智慧的命理師。"""
+【批命要求】請依序輸出以下段落，每段必須有具體數字或時間點，禁止模糊帶過：
+
+▍一、{current_year} 年流年總論
+先明確說出 {current_year} 年的天干地支（請自行推算），再說明與命主日主的生剋關係，判斷今年是「順年」還是「考驗年」，給出整體吉凶評分（用★表示，滿分5顆，必須給分）。
+
+▍二、上半年重點（1月～6月）
+- 最有利的月份（具體說出幾月，說明原因）
+- 需要謹慎的月份（具體說出幾月，說明原因）
+- 一個具體的行動建議（可以立刻執行的）
+
+▍三、下半年重點（7月～12月）
+同上格式，說明下半年走向，列出最有利與需謹慎的月份。
+
+▍四、感情運（依性別給出針對性解讀）
+- 單身者：幾月份桃花最旺，對象的命格特徵描述
+- 有伴侶者：感情穩定期與考驗期各在幾月
+
+▍五、事業財運
+- 升遷或轉職的最佳時機（具體說出幾月）
+- 偏財運最旺的時間段（具體說出幾月）
+- 需要避免的財務風險類型（具體說出是什麼）
+
+▍六、健康提示
+說明今年需要注意的身體部位（根據五行說出具體部位），給出 1 個具體養生建議。
+
+▍七、年度開運錦囊
+- 開運顏色（說出具體顏色）
+- 開運方位（說出東南西北哪個方向，說明原因）
+- 今年最重要的一句話建議
+
+語氣溫柔神秘，像命理師親批，總字數約 550 字。"""
+
 
         chat_completion = groq_client.chat.completions.create(
             messages=[
@@ -1470,18 +1570,48 @@ def _run_ziwei_background(line_user_id, data, service_id):
         elif gender == "F":
             gender_hint = "性別：女性\n（紫微女命重夫妻宮、子女宮，感情宮位為核心）\n"
 
-        user_prompt = f"""請進行紫微斗數命盤解析：
-使用者生辰：{birth}（{zodiac}）
+        tz = pytz.timezone("Asia/Taipei")
+        current_year = datetime.datetime.now(tz).year
+        user_prompt = f"""你是一位精通紫微斗數三十年的命理師，請用繁體中文進行專業批命。
+
+【命主資料】
+生辰：{birth}（{zodiac}）
 {gender_hint}{shichen_hint}
 
-請給出約500字的紫微斗數命盤解讀，包含：
-1. 命宮主星分析（推算主星並說明特質）
-2. 個人命格特質與人生主軸
-3. 事業宮解析（適合的職業方向）
-4. 感情宮解析（依性別給出針對性解讀）
-5. 財帛宮解析（財運特質與理財建議）
-6. 近期流年重點（當前大限與流年互動）
-語氣溫柔神秘，像一位有智慧的紫微命理師。"""
+【批命要求】請依序輸出以下六個段落，每段都要有具體內容，禁止模糊帶過：
+
+▍一、命宮主星
+明確說出命宮落在哪個宮位、主星是什麼（如：紫微、天機、太陽、武曲等），並說明此主星的核心性格特質 2~3 點。
+
+▍二、命格特質
+根據主星與輔星組合，說明此人的人生主軸、優勢與盲點各 2 點。請用「您天生具備⋯」「您容易⋯」的句式，要具體。
+
+▍三、事業宮解析
+說明官祿宮的星曜組合，給出：
+- 最適合的職業方向（列出 2~3 種具體職業名稱）
+- 事業發展的關鍵時間點（具體說出幾歲前後）
+- 職場上的貴人特徵（什麼樣的人、來自哪個方位）
+
+▍四、感情宮解析（依性別給出針對性解讀）
+說明夫妻宮的星曜，給出：
+- 另一半的命格特質描述（具體說出個性特徵）
+- 感情的考驗期（具體說出大約幾歲）
+- 一個具體的感情建議（可以立刻執行的）
+
+▍五、財帛宮解析
+說明財帛宮星曜，給出：
+- 正財運或偏財運哪個較強（明確說出哪個強）
+- 最佳理財方式（具體說出 2 種，如：不動產、股票、存款）
+- 財運最旺的年齡段（具體說出幾歲到幾歲）
+
+▍六、{current_year} 年流年重點
+結合流年天干地支，說明：
+- 今年整體運勢吉凶（用「上半年⋯下半年⋯」分段，各說出重點月份）
+- 今年最需要注意的一件事（具體說出）
+- 今年的開運建議（顏色、方位、行動各一條，都要具體）
+
+語氣溫柔神秘，像命理師親批，總字數約 550 字。"""
+
 
         chat_completion = groq_client.chat.completions.create(
             messages=[
@@ -4604,14 +4734,49 @@ def handle_postback(event):
             service_type = data.replace("follow_up_", "")
             expected_count = None
 
-        svc = get_active_service(line_user_id, service_type)
-        if not svc:
+        limit = FOLLOW_UP_LIMITS.get(service_type, 0)
+
+        # ★ 直接從 DB 查最新狀態，不用快取
+        svc_result = supabase.table("services") \
+            .select("*") \
+            .eq("user_id", line_user_id) \
+            .eq("service_type", service_type) \
+            .in_("status", ["used", "completed"]) \
+            .order("used_at", desc=True) \
+            .limit(1).execute()
+
+        if not svc_result.data:
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[TextMessage(text="⚠️ 追問次數已用完，或找不到有效服務 🙏")]
+                    messages=[TextMessage(text="⚠️ 找不到有效服務，請重新購買 🙏")]
                 ))
             return
+
+        svc = svc_result.data[0]
+        current_count = svc.get("follow_up_count") or 0
+
+        # ★ 已完成或已達上限，直接拒絕
+        if svc.get("status") == "completed" or current_count >= limit:
+            supabase.table("services").update({
+                "status": "completed"
+            }).eq("service_id", svc["service_id"]).execute()
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text="⚠️ 追問次數已全部使用完畢 🙏\n\n若有新的困惑，歡迎再次購買服務 💎")]
+                ))
+            return
+
+        # ★ 卡片版本過期（用戶點了舊的追問按鈕）
+        if expected_count is not None and current_count != expected_count:
+            with ApiClient(configuration) as api_client:
+                MessagingApi(api_client).reply_message(ReplyMessageRequest(
+                    reply_token=event.reply_token,
+                    messages=[TextMessage(text="⚠️ 此追問卡片已失效，請查看最新的解析訊息 🙏")]
+                ))
+            return
+
 
         current_count = svc.get("follow_up_count") or 0
         limit = FOLLOW_UP_LIMITS.get(service_type, 0)
