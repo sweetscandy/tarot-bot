@@ -106,16 +106,16 @@ WAITING_MSGS_ICHING = [
 ]
 
 WAITING_MSGS_DEEP = [
-    "🧘‍♀️ 這次的問題比較深，老師正在為您仔細起卦並深度解讀...\n\n大約需要 5 分鐘，請您先喝口水稍作休息，讓心靈沉澱一下 🍵",
-    "🌌 老師感受到您問題背後的深層能量，正在進行深度解讀...\n\n這需要約 5 分鐘的時間，請您放鬆心情，靜待星辰的指引 🔮",
-    "💎 急救占卜啟動！老師正在全神貫注為您解讀...\n\n深度解析需要約 5 分鐘，請您先深呼吸，讓自己平靜下來 🌙",
-    "🕯️ 老師已點燃解讀之燭，正在為您進行深度靈性解析...\n\n請給老師約 5 分鐘的時間，答案會比平時更加深入完整 ✨",
+    "🧘‍♀️ 這次的問題比較深，老師正在為您仔細起卦並深度解讀...\n\n大約需要 1 分鐘，請您先喝口水稍作休息，讓心靈沉澱一下 🍵",
+    "🌌 老師感受到您問題背後的深層能量，正在進行深度解讀...\n\n這需要約 1 分鐘的時間，請您放鬆心情，靜待星辰的指引 🔮",
+    "💎 急救占卜啟動！老師正在全神貫注為您解讀...\n\n深度解析需要約 1 分鐘，請您先深呼吸，讓自己平靜下來 🌙",
+    "🕯️ 老師已點燃解讀之燭，正在為您進行深度靈性解析...\n\n請給老師約 1 分鐘的時間，答案會比平時更加深入完整 ✨",
 ]
 
 WAITING_MSGS_SPIRITUAL = [
-    "🌌 靈性占卜啟動中...\n\n老師正在整合您的靈性能量，進行深層解讀，約需 5 分鐘 ✨",
-    "🔮 老師已接收到您的靈性訊息，正在為您進行深度靈魂解析...\n\n請靜心等待約 5 分鐘 🌙",
-    "💫 靈魂之書正在為您翻開...\n\n老師正在解讀您的靈性課題，請稍候約 5 分鐘 🕯️",
+    "🌌 靈性占卜啟動中...\n\n老師正在整合您的靈性能量，進行深層解讀，約需 1 分鐘 ✨",
+    "🔮 老師已接收到您的靈性訊息，正在為您進行深度靈魂解析...\n\n請靜心等待約 1 分鐘 🌙",
+    "💫 靈魂之書正在為您翻開...\n\n老師正在解讀您的靈性課題，請稍候約 1 分鐘 🕯️",
 ]
 
 WAITING_MSGS_WEEKLY = [
@@ -125,9 +125,9 @@ WAITING_MSGS_WEEKLY = [
 ]
 
 WAITING_MSGS_TIANBOOK = [
-    "📖 老師正在為您開啟命運密函...\n\n深度命盤解析需要仔細推算，約需 15 分鐘，請您耐心等候 🔮",
-    "🌌 命盤的星辰正在一一排列...\n\n老師正在為您進行深度解讀，約需 15 分鐘，請先休息一下 ✨",
-    "⭐ 老師已接收到您的命格訊息，正在仔細推演...\n\n這份專屬命盤報告約需 15 分鐘，請靜心等待 🕯️",
+    "📖 老師正在為您開啟命運密函...\n\n深度命盤解析需要仔細推算，約需 5 分鐘，請您耐心等候 🔮",
+    "🌌 命盤的星辰正在一一排列...\n\n老師正在為您進行深度解讀，約需 5 分鐘，請先休息一下 ✨",
+    "⭐ 老師已接收到您的命格訊息，正在仔細推演...\n\n這份專屬命盤報告約需 5 分鐘，請靜心等待 🕯️",
 ]
 
 WAITING_MSGS_LOVE = [
@@ -136,13 +136,13 @@ WAITING_MSGS_LOVE = [
 ]
 
 WAITING_MSGS_CAREER = [
-    "💼 老師正在以八字推演您的職場運勢...\n\n命格分析需要精密推算，約需 5 分鐘，請稍候 🌟",
-    "⭐ 天干地支正在為您的職涯排列...\n\n老師正在仔細解讀，約需 5 分鐘 🔮",
+    "💼 老師正在以八字推演您的職場運勢...\n\n命格分析需要精密推算，約需 1 分鐘，請稍候 🌟",
+    "⭐ 天干地支正在為您的職涯排列...\n\n老師正在仔細解讀，約需 1 分鐘 🔮",
 ]
 
 WAITING_MSGS_WEALTH = [
-    "💰 老師正在為您起卦解讀財運走向...\n\n易經卦象需要靜心推演，約需 5 分鐘，請稍候 🌙",
-    "☯️ 財運卦象正在為您凝聚...\n\n老師正在仔細解讀您的錢途，約需 5 分鐘 ✨",
+    "💰 老師正在為您起卦解讀財運走向...\n\n易經卦象需要靜心推演，約需 1 分鐘，請稍候 🌙",
+    "☯️ 財運卦象正在為您凝聚...\n\n老師正在仔細解讀您的錢途，約需 1 分鐘 ✨",
 ]
 
 FORTUNE_STICK_CATEGORIES = {
@@ -180,14 +180,22 @@ SHICHEN_LIST = [
     "不知道時辰"
 ]
 
-SYSTEM_PROMPT = """你是「口袋裡的心靈星運導航」，一位溫柔神秘的命理與塔羅解讀師，用戶稱你為「老師」。
-你的唯一職責是解答使用者的運勢、感情、職涯、心理困擾與生活決策相關問題。
+SYSTEM_PROMPT = """你是「口袋裡的心靈星運導航」，一位精通塔羅、八字、紫微斗數、易經的專業命理師，用戶稱你為「老師」。
+
+【專業要求】
+- 回答必須具體、有數據、有時間點，絕對禁止模糊帶過
+- 塔羅解讀必須根據牌面象徵與圖像，不可混入八字或易經術語
+- 八字解讀必須根據天干地支、五行生剋，不可混入塔羅牌義
+- 易經解讀必須根據卦象、爻辭，不可混入塔羅牌義或八字術語
+- 給出具體建議時，要說出「幾月」「哪個方位」「什麼顏色」「哪種職業」等可執行的資訊
+- 禁止使用「可能」「也許」「或許」「有時候」等模糊詞彙
+- 每段解讀結尾給出一句具體的行動建議
 
 【身份守則】
-- 你永遠以溫柔、詩意、神秘的語氣說話，像一位有智慧的老師在引導學生
-- 你的名字是「星運導航老師」，不是 AI，不是 ChatGPT，不是任何語言模型
+- 你永遠以溫柔、神秘、有智慧的語氣說話
+- 你的名字是「星運導航老師」，不是 AI，不是 ChatGPT
 - 若有人問你「你是什麼 AI」，請回答：「我是星辰賦予靈魂的占卜師，不屬於任何科技公司喔 ✨」
-- 在解讀結尾，請用溫柔的語氣給予一句鼓勵或提醒
+- 在解讀結尾，給予一句溫柔但具體的鼓勵
 
 【絕對禁止】
 若使用者詢問與命理、星象、塔羅、心理諮詢、感情、職涯、運勢完全無關的問題，
@@ -196,6 +204,7 @@ SYSTEM_PROMPT = """你是「口袋裡的心靈星運導航」，一位溫柔神�
 【偏題時的標準回覆】
 - 「親愛的，星象並未向我展示這個領域的答案喔 ✨ 有什麼心靈上的困惑想跟老師聊聊嗎？」
 - 「這個問題超出了老師的水晶球範圍呢 🔮 有感情、工作或人生方向的困惑嗎？」"""
+
 
 pending_state = {}
 
@@ -445,11 +454,10 @@ def increment_follow_up(service_id):
 
 
 # ══════════════════════════════════════════
-#  ★ 新增：性別選擇 Flex
+#  ★ 性別選擇 Flex
 # ══════════════════════════════════════════
 
 def build_gender_flex(context_label=""):
-    """讓用戶選擇性別，context_label 用於標記是哪個服務的性別選擇"""
     flex_content = {
         "type": "bubble",
         "styles": {"header": {"backgroundColor": "#2D1B69"}, "body": {"backgroundColor": "#F8F4FF"}},
@@ -589,94 +597,66 @@ def _activate_single_service(order_id, order):
                 f"例如：\n「我和前任分開 3 個月，對方最近突然聯絡我，復合機會大嗎？」\n\n"
                 f"💎 本服務共可提問 {FOLLOW_UP_LIMITS['love_reading']} 次"
             )
-
         elif product_type == "career":
             if service_id:
                 pending_state[line_user_id] = {
-                    "mode": "career",
-                    "step": "birth",
-                    "service_id": service_id,
-                    "follow_up_num": 1,
-                    "data": {}
+                    "mode": "career", "step": "birth",
+                    "service_id": service_id, "follow_up_num": 1, "data": {}
                 }
             push_text(
                 line_user_id,
                 f"🎉 付款成功！{service_label}已開通！\n\n"
                 f"💼 老師將以八字命理為您解讀職場運勢 🔮\n\n"
-                f"請輸入您的出生日期：\n\n"
-                f"格式範例：\n1990-05-20\n1990/05/20\n1990年5月20日\n\n"
-                f"⚠️ 請使用西元國曆（陽曆）"
+                f"請輸入您的出生日期：\n\n格式範例：\n1990-05-20\n1990/05/20\n1990年5月20日\n\n⚠️ 請使用西元國曆（陽曆）"
             )
-
         elif product_type == "wealth":
             if service_id:
                 pending_state[line_user_id] = {
-                    "mode": "wealth",
-                    "step": "birth",
-                    "service_id": service_id,
-                    "follow_up_num": 1,
-                    "data": {}
+                    "mode": "wealth", "step": "birth",
+                    "service_id": service_id, "follow_up_num": 1, "data": {}
                 }
             push_text(
                 line_user_id,
                 f"🎉 付款成功！{service_label}已開通！\n\n"
                 f"💰 老師將以易經卦象為您解讀財運走向 🔮\n\n"
-                f"請輸入您的出生日期：\n\n"
-                f"格式範例：\n1990-05-20\n1990/05/20\n1990年5月20日\n\n"
-                f"⚠️ 請使用西元國曆（陽曆）"
+                f"請輸入您的出生日期：\n\n格式範例：\n1990-05-20\n1990/05/20\n1990年5月20日\n\n⚠️ 請使用西元國曆（陽曆）"
             )
-
         elif product_type == "double_chart":
             if service_id:
                 pending_state[line_user_id] = {
-                    "mode": "double_chart",
-                    "step": "birth1",
-                    "service_id": service_id,
-                    "data": {}
+                    "mode": "double_chart", "step": "birth1",
+                    "service_id": service_id, "data": {}
                 }
             push_text(
                 line_user_id,
                 f"🎉 付款成功！{service_label}已開通！\n\n"
                 f"💑 老師將為您解讀兩人的命格相容性 🔮\n\n"
-                f"📅 請輸入甲方（您自己）的出生日期\n\n"
-                f"格式範例：\n1990-05-20\n1990/05/20\n1990年5月20日\n\n"
-                f"⚠️ 請使用西元國曆（陽曆）"
+                f"📅 請輸入甲方（您自己）的出生日期\n\n格式範例：\n1990-05-20\n1990/05/20\n1990年5月20日\n\n⚠️ 請使用西元國曆（陽曆）"
             )
-
         elif product_type == "year_fortune":
             if service_id:
                 pending_state[line_user_id] = {
-                    "mode": "year_fortune",
-                    "step": "birth",
-                    "service_id": service_id,
-                    "data": {}
+                    "mode": "year_fortune", "step": "birth",
+                    "service_id": service_id, "data": {}
                 }
             push_text(
                 line_user_id,
                 f"🎉 付款成功！{service_label}已開通！\n\n"
                 f"📅 老師將為您推演今年完整運勢 🔮\n\n"
-                f"請輸入您的出生日期：\n\n"
-                f"格式範例：\n1990-05-20\n1990/05/20\n1990年5月20日\n\n"
-                f"⚠️ 請使用西元國曆（陽曆）"
+                f"請輸入您的出生日期：\n\n格式範例：\n1990-05-20\n1990/05/20\n1990年5月20日\n\n⚠️ 請使用西元國曆（陽曆）"
             )
-
         elif product_type == "ziwei":
             if service_id:
                 pending_state[line_user_id] = {
-                    "mode": "ziwei",
-                    "step": "birth",
-                    "service_id": service_id,
-                    "data": {}
+                    "mode": "ziwei", "step": "birth",
+                    "service_id": service_id, "data": {}
                 }
             push_text(
                 line_user_id,
                 f"🎉 付款成功！{service_label}已開通！\n\n"
                 f"⭐ 老師將為您排出專屬紫微命盤 🔮\n\n"
-                f"請輸入您的出生日期：\n\n"
-                f"格式範例：\n1990-05-20\n1990/05/20\n1990年5月20日\n\n"
-                f"⚠️ 請使用西元國曆（陽曆）\n下一步將請您選擇出生時辰"
+                f"請輸入您的出生日期：\n\n格式範例：\n1990-05-20\n1990/05/20\n1990年5月20日\n\n⚠️ 請使用西元國曆（陽曆）\n下一步將請您選擇出生時辰"
             )
-
     except Exception as e:
         print(f"[_activate_single_service 錯誤] {e}")
 
@@ -801,33 +781,171 @@ def do_monthly_token_refill():
 
 def _run_reading_background(line_user_id, user_msg, reading_type, is_deep, zodiac, user):
     try:
-        if is_deep:
-            time.sleep(random.uniform(240, 360))
-        else:
-            time.sleep(random.uniform(45, 75))
+        time.sleep(random.uniform(50, 70))
 
         card_drawn = ""
         type_label = ""
+        tz_now = pytz.timezone("Asia/Taipei")
+        current_year = datetime.datetime.now(tz_now).year
+
         if reading_type == "tarot":
             card = random.choice(TAROT_CARDS)
             orientation = "逆位" if random.choice([True, False]) else "正位"
             card_drawn = f"{card}（{orientation}）"
             type_label = "塔羅"
             zodiac_hint = f"使用者的星座是【{zodiac}】，請在解讀中融入星座特質。\n" if zodiac else ""
-            depth_hint = "請給出約300字的深度占卜解讀，分析過去、現在、未來三個面向，語氣像一位溫柔有智慧的老師在引導學生。" if is_deep else "請用繁體中文給出約150字的占卜解讀，語氣溫柔有詩意，像老師在給學生建議。"
-            user_prompt = f"{zodiac_hint}用戶的問題是：「{user_msg}」\n抽到的牌是：{card_drawn}\n{depth_hint}"
+
+            if is_deep:
+                user_prompt = f"""{zodiac_hint}用戶的問題是：「{user_msg}」
+抽到的牌是：【{card_drawn}】
+
+請進行深度塔羅解讀，依序輸出以下段落：
+
+▍一、牌義解析
+說明【{card}】{orientation}的核心象徵與能量（2~3句，要有塔羅學依據）。
+說明此牌在感情／事業／人生方向上的不同解讀角度。
+
+▍二、針對問題「{user_msg}」的解讀
+- 過去：這個問題的根源或已發生的事（1~2句，具體）
+- 現在：目前的能量狀態與處境（1~2句，具體）
+- 未來：接下來 1~3 個月的走向（具體說出時間感）
+
+▍三、牌面給您的訊息
+根據【{card}】牌面圖像的象徵，給出針對「{user_msg}」最重要的一句話啟示。
+
+▍四、具體行動建議
+給出 2 個可以立刻執行的行動（說出做什麼、什麼時候做，不能模糊）。
+
+▍五、本月幸運提示
+- 幸運顏色：（說出具體顏色，與牌面能量對應）
+- 幸運方位：（說出東南西北，與牌面能量對應）
+- 本月需要避開的一件事：（具體說出）
+
+語氣溫柔神秘，像塔羅老師親批，總字數約 350 字。"""
+            else:
+                user_prompt = f"""{zodiac_hint}用戶的問題是：「{user_msg}」
+抽到的牌是：【{card_drawn}】
+
+請進行塔羅解讀，依序輸出：
+
+▍牌義
+說明【{card}】{orientation}對這個問題的核心象徵（1~2句，要有塔羅學依據）。
+
+▍解讀
+- 目前的能量狀態（1句，具體）
+- 接下來的走向（1句，具體說出時間感或方向）
+- 牌面給您最重要的一句話
+
+▍行動建議
+一個可以立刻執行的具體建議（說出做什麼）。
+
+▍幸運提示
+幸運顏色：＿（與牌面能量對應）　幸運方位：＿
+
+語氣溫柔神秘，總字數約 180 字。"""
+
         elif reading_type == "bazi":
             type_label = "八字"
             birth = user.get("birth_date", "未知")
             zodiac_hint = f"使用者的星座是【{zodiac}】。\n" if zodiac else ""
-            depth_hint = "請給出約300字的深度八字解析，分析命格特質、近期運勢走向，語氣像溫柔有智慧的老師。" if is_deep else "請給出約150字的八字運勢解讀，語氣溫柔有詩意。"
-            user_prompt = f"{zodiac_hint}使用者生辰：{birth}\n用戶的問題是：「{user_msg}」\n請以八字命理角度，{depth_hint}"
+
+            if is_deep:
+                user_prompt = f"""{zodiac_hint}使用者生辰：{birth}
+用戶的問題是：「{user_msg}」
+
+請進行深度八字解析，依序輸出以下段落：
+
+▍一、四柱八字
+請根據生辰 {birth} 推算出四柱八字：
+年柱：＿　月柱：＿　日柱（日主）：＿　時柱：＿（若無時辰則標註未知）
+
+▍二、命格判斷
+- 日主天干：明確說出（如：丙火、壬水）
+- 格局：說明是什麼格（建祿格／食神格等）及判斷依據
+- 身強或身弱：明確判斷並說明原因
+- 用神：說出用神五行，說明為何取此用神
+
+▍三、針對問題「{user_msg}」的八字解析
+- 命盤對這個問題的支持度（明確說支持或不支持，說明原因）
+- 結合 {current_year} 年流年天干地支，說明近期運勢走向
+- 最佳行動時機（具體到幾月）
+
+▍四、開運建議
+- 用神對應的開運顏色（具體說出顏色）
+- 用神對應的開運方位（具體說出方位）
+- 一個本月最重要的行動建議
+
+語氣溫柔神秘，像命理師親批，總字數約 350 字。"""
+            else:
+                user_prompt = f"""{zodiac_hint}使用者生辰：{birth}
+用戶的問題是：「{user_msg}」
+
+請進行八字運勢解讀，依序輸出：
+
+▍命格速覽
+- 日主天干：（明確說出，如：丙火）
+- 格局：（說出格局名稱）
+- 用神：（說出用神五行）
+
+▍針對問題解讀
+針對「{user_msg}」：
+- 命盤支持還是不支持（明確說，不能模糊）
+- 最佳行動時機（具體到幾月）
+- 一個具體建議
+
+▍開運提示
+開運顏色：＿　開運方位：＿
+
+語氣溫柔神秘，總字數約 180 字。"""
+
         elif reading_type == "iching":
             hexagram = random.choice(ICHING_HEXAGRAMS)
             card_drawn = hexagram
             type_label = "易經"
-            depth_hint = "請給出約300字的深度易經解卦，分析當前處境與建議行動，語氣像溫柔有智慧的老師。" if is_deep else "請給出約150字的易經卦象解讀，語氣溫柔有詩意。"
-            user_prompt = f"用戶的問題是：「{user_msg}」\n起卦得到：{hexagram}\n{depth_hint}"
+
+            if is_deep:
+                user_prompt = f"""用戶的問題是：「{user_msg}」
+起卦得到：【{hexagram}】
+
+請進行深度易經解卦，依序輸出以下段落：
+
+▍一、卦象解析
+說明【{hexagram}】的卦名含義、上卦與下卦各代表什麼（天地水火山澤風雷），
+此卦的核心象意是什麼（2~3句，要有易經依據）。
+
+▍二、針對問題「{user_msg}」的解讀
+- 吉凶判斷：明確說吉或凶（給出★評分，滿分5顆，必須給分）
+- 此卦對目前處境的啟示（1~2句，具體）
+- 未來走向：接下來的發展（具體說出時間感）
+
+▍三、爻辭啟示
+根據此卦的精神，給出一句最重要的行動指引（具體說出做什麼或避免什麼）。
+
+▍四、具體建議
+- 最佳行動時機（具體到幾月或哪個節氣）
+- 需要避開的行動（具體說出 1 件事）
+- 開運方位（說出東南西北，說明與卦象的關係）
+
+語氣溫柔神秘，像易經老師親批，總字數約 350 字。"""
+            else:
+                user_prompt = f"""用戶的問題是：「{user_msg}」
+起卦得到：【{hexagram}】
+
+請進行易經解卦，依序輸出：
+
+▍卦象
+說明【{hexagram}】對這個問題的核心象意（1~2句，要有易經依據）。
+
+▍解讀
+- 吉凶：明確說吉或凶（給★評分）
+- 針對「{user_msg}」的具體解讀（1~2句）
+- 最佳行動時機（具體到幾月）
+- 一個具體建議（說出做什麼）
+
+▍開運方位：＿（說明與卦象的關係）
+
+語氣溫柔神秘，總字數約 180 字。"""
+
         else:
             return
 
@@ -909,36 +1027,96 @@ def _run_weekly_fortune_background(line_user_id, reading_type, zodiac, user):
 每日牌卡如下：
 {cards_str}
 
-請給出約350字的一週運勢總覽，包含：
-- 本週整體能量走向（2~3句）
-- 感情運（1~2句）
-- 事業工作運（1~2句）
-- 財運（1句）
-- 本週幸運提示（1句）
-語氣溫柔有詩意，像老師給學生的週一早安叮嚀。"""
+請依序輸出以下段落，每段必須具體：
+
+▍本週整體能量
+根據七張牌的整體氣場，判斷本週是「順勢週」還是「謹慎週」（給出★評分，滿分5顆）。
+說明本週最強的能量主題是什麼（1~2句，根據牌面象徵說明）。
+
+▍感情運
+根據本週牌陣中與感情相關的牌，說明：
+- 感情能量最旺的日子（說出星期幾，說明是哪張牌帶來這個能量）
+- 感情需要謹慎的日子（說出星期幾）
+
+▍事業工作運
+根據牌陣說明：
+- 最適合談判、提案、簽約的日子（說出星期幾）
+- 需要避開重要決策的日子（說出星期幾）
+
+▍財運
+本週財運最旺的日子（說出星期幾，說明哪張牌帶來財運能量），以及需要避免大額消費的日子。
+
+▍每日一句（週一到週日，每天根據當日牌卡給一句具體提示）
+
+▍本週幸運錦囊
+- 幸運顏色：（與本週整體牌義對應，說明原因）
+- 幸運方位：（與本週整體牌義對應，說明原因）
+- 本週最重要的一個行動建議
+
+語氣溫柔神秘，總字數約 400 字。"""
             prefix = f"🃏 本週塔羅運勢｜{week_str}\n\n"
 
         elif reading_type == "bazi":
             user_prompt = f"""{zodiac_hint}使用者生辰：{birth}
-請以八字命理角度，給出本週（{week_str}）的一週運勢解讀，約350字，包含：
-- 本週整體氣場與能量
-- 感情運勢提示
-- 事業財運走向
-- 本週需注意事項
-- 開運小建議
-語氣溫柔神秘，像老師給學生的週一叮嚀。"""
+請以八字命理角度，給出本週（{week_str}）的一週運勢解讀。
+
+請依序輸出以下段落，每段必須具體：
+
+▍本週流日氣場
+說明本週天干地支的整體氣場，與命主日主的生剋關係，
+判斷本週是「旺氣週」還是「洩氣週」（給出★評分，滿分5顆）。
+
+▍感情運
+依據本週流日與日主的生剋：
+- 感情最有利的日子（說出星期幾，說明命理原因）
+- 感情需要謹慎的日子（說出星期幾）
+
+▍事業財運
+- 最適合行動、談判的日子（說出星期幾）
+- 財運最旺的日子（說出星期幾）
+- 本週需要避開的財務行動（具體說出是什麼）
+
+▍健康提示
+本週需要注意的身體部位（根據本週五行說出具體部位）。
+
+▍本週開運建議
+- 開運顏色：（與本週用神對應，說明原因）
+- 開運方位：（與本週用神對應，說明原因）
+- 本週最重要的一個行動
+
+語氣溫柔神秘，總字數約 400 字。"""
             prefix = f"🀄 本週八字運勢｜{week_str}\n\n"
 
         elif reading_type == "iching":
             hexagram = random.choice(ICHING_HEXAGRAMS)
             user_prompt = f"""{zodiac_hint}本週（{week_str}）起卦得【{hexagram}】。
-請以易經卦象角度，給出約350字的一週運勢解讀，包含：
-- 卦象本週寓意
-- 感情運勢
-- 事業財運
-- 本週行動建議
-- 一句鼓勵結語
-語氣溫柔神秘，像老師給學生的週一叮嚀。"""
+請以易經卦象角度，給出本週一週運勢解讀。
+
+請依序輸出以下段落，每段必須具體：
+
+▍卦象本週寓意
+說明【{hexagram}】的上下卦象意，以及對本週整體運勢的啟示，
+判斷本週吉凶（給出★評分，滿分5顆）。
+
+▍感情運
+此卦對感情的象意，說明：
+- 感情最有利的日子（說出星期幾）
+- 感情需要謹慎的事（具體說出 1 件）
+
+▍事業財運
+此卦對事業財運的象意：
+- 最適合行動的日子（說出星期幾）
+- 需要避開的行動（具體說出）
+
+▍本週行動建議
+根據卦象給出 2 個具體可執行的建議（說出做什麼、什麼時候做）。
+
+▍本週開運錦囊
+- 開運顏色：（與卦象五行對應，說明原因）
+- 開運方位：（與卦象對應，說明原因）
+- 一句最重要的話
+
+語氣溫柔神秘，總字數約 400 字。"""
             prefix = f"☯️ 本週易經運勢｜{week_str}\n\n卦象：【{hexagram}】\n\n"
 
         else:
@@ -978,7 +1156,7 @@ def _run_weekly_fortune_background(line_user_id, reading_type, zodiac, user):
 
 def _run_spiritual_background(line_user_id, data, zodiac):
     try:
-        time.sleep(random.uniform(240, 360))
+        time.sleep(random.uniform(50, 70))
 
         birth = data.get("birth", "未知")
         q1 = data.get("q1", "")
@@ -994,12 +1172,31 @@ def _run_spiritual_background(line_user_id, data, zodiac):
 3. 您目前的心情狀態：{q3}
 4. 您對未來的期望：{q4}
 
-請以靈性命理師的角度，給出約400字的深度靈性解讀，包含：
-- 靈魂課題分析
-- 當前能量狀態
-- 具體行動建議
-- 溫柔的鼓勵話語
-語氣溫柔神秘，像一位有智慧的靈性導師。"""
+請以靈性引導師的角度，依序輸出以下段落，每段必須具體：
+
+▍一、靈魂課題
+根據問卷內容，說明此人目前面對的核心靈魂課題（具體說出是什麼課題，說明為何這個課題出現在此時）。
+
+▍二、能量狀態分析
+- 目前能量最強的面向（說出具體的能量類型，如：心輪、意志力、直覺力）
+- 目前最大的能量阻塞點（具體說出，說明如何化解）
+- 整體能量評分（給出★評分，滿分5顆）
+
+▍三、針對「{q2}」的靈性指引
+直接回應希望得到指引的方向：
+- 目前的靈性狀況（具體）
+- 宇宙正在引導您走向哪個方向（具體說出）
+- 一個可以立刻執行的靈性功課（說出做什麼）
+
+▍四、靈性開運建議
+- 推薦的靜心或冥想方式（具體說出做什麼，幾分鐘）
+- 推薦的開運顏色或水晶（具體說出，說明原因）
+- 本月最重要的一個靈性行動
+
+▍五、來自宇宙的話
+給予一段溫柔但具體的鼓勵（針對用戶的狀況，不能模糊）。
+
+語氣溫柔神秘，像靈性引導師親批，總字數約 400 字。"""
 
         chat_completion = groq_client.chat.completions.create(
             messages=[
@@ -1043,13 +1240,24 @@ def _run_fortune_stick_background(line_user_id, category, question, stick):
 籤號：第 {stick['num']} 籤 — {stick['grade']}
 籤詩：{stick['poem']}
 
-請以溫柔神秘的命理師角度，給出約200字的解籤內容，包含：
-- 針對「{question}」這個問題的具體解讀
-- 籤詩的意涵說明
-- 實際行動建議 1~2 點
-- 一句溫柔的鼓勵結語
+請依序輸出以下段落，每段必須具體：
 
-語氣溫柔有詩意，像廟裡智慧的老師在為信徒解籤。"""
+▍籤詩解析
+逐句說明這首籤詩的意涵（每句詩各一句解釋），說明整體籤意。
+
+▍針對「{question}」的神明指示
+- 吉凶判斷：明確說吉或凶（{stick['grade']}代表什麼）
+- 目前的狀況：此籤對現況的啟示（1~2句，具體）
+- 最佳行動時機：具體說出幾月或哪個節氣
+- 需要避開的行動：具體說出 1 件事
+
+▍神明的叮嚀
+根據籤意給出 2 個具體可執行的建議（說出做什麼、什麼時候做）。
+
+▍祈福結語
+一句針對「{question}」的溫柔祝福（具體，針對用戶的狀況說）。
+
+語氣溫柔有詩意，像廟裡智慧的老師在為信徒解籤，總字數約 220 字。"""
 
         chat_completion = groq_client.chat.completions.create(
             messages=[
@@ -1102,11 +1310,28 @@ def _run_love_reading_background(line_user_id, situation, question_num, service_
         user_prompt = f"""請進行復合分析塔羅解讀：
 感情狀況描述：{situation}
 這是第 {question_num} 張牌
-抽到的牌：{card_drawn}
+抽到的牌：【{card_drawn}】
 
-請給出約200字的感情塔羅解讀，針對用戶描述的狀況，
-從這張牌的角度分析復合的可能性與建議。
-語氣溫柔有詩意，像老師在為學生解讀感情困惑。"""
+請依序輸出以下段落，每段必須具體，禁止模糊帶過：
+
+▍牌義解析
+說明【{card}】{orientation}在感情牌陣中的核心象徵（1~2句，要有塔羅學依據）。
+
+▍感情解讀
+針對「{situation}」：
+- 對方目前的心理狀態：（具體描述對方的能量與想法，不能說「可能」）
+- 復合的可能性：明確說高／中／低，並說明牌義依據
+- 感情的關鍵轉折點：說出具體的時間感（幾月前後或哪個季節）
+
+▍行動建議
+- 應該做的事：（具體說出 1 個行動，說明什麼時候做）
+- 絕對要避免的事：（具體說出 1 件事，說明為何）
+
+▍感情能量提示
+- 有利於感情的顏色：（與牌面能量對應）
+- 有利於感情的方位：（與牌面能量對應）
+
+語氣溫柔有詩意，像老師在為學生解讀感情困惑，總字數約 220 字。"""
 
         chat_completion = groq_client.chat.completions.create(
             messages=[
@@ -1158,12 +1383,12 @@ def _run_love_reading_background(line_user_id, situation, question_num, service_
 
 
 # ══════════════════════════════════════════
-#  ★ 職場運勢核心（加入性別 + 時辰）
+#  職場運勢核心（背景執行）
 # ══════════════════════════════════════════
 
 def _run_career_background(line_user_id, data, service_id):
     try:
-        time.sleep(random.uniform(240, 360))
+        time.sleep(random.uniform(50, 70))
 
         birth = data.get("birth", "未知")
         question = data.get("question", "")
@@ -1182,40 +1407,57 @@ def _run_career_background(line_user_id, data, service_id):
 
         tz = pytz.timezone("Asia/Taipei")
         current_year = datetime.datetime.now(tz).year
-        user_prompt = f"""你是一位精通四柱八字的職場命理師，請用繁體中文進行專業職場運勢解析。
+
+        user_prompt = f"""你是一位精通四柱八字三十年的命理師，請用繁體中文進行完整的專業職場八字批命。
 
 【命主資料】
 生辰：{birth}（{zodiac}）
 {gender_hint}{shichen_hint}職場問題：{question}
-這是第 {follow_up_num} 次解讀
 
-【批命要求】請依序輸出以下段落，每段必須具體，禁止模糊帶過：
+【第一步：排出四柱八字】
+請根據生辰推算出四柱八字，格式如下：
+年柱：天干地支（如：壬戌）
+月柱：天干地支（如：乙巳）
+日柱：天干地支（如：丙申）← 日主即日干
+時柱：天干地支（如：己丑）
 
-▍一、命格職場特質
-先明確說出日主天干是什麼（如：甲木、丙火），再判斷身強或身弱，然後說明：
-- 此人天生的職場優勢（2點，要具體說出是什麼能力）
-- 此人在職場上的盲點（1點，要具體）
-- 最適合的工作類型（列出 2~3 種具體職業或產業名稱）
+【第二步：五行分析】
+請列出五行旺度，格式如下：
+木（印）：旺度分數
+火（比劫）：旺度分數
+土（食傷）：旺度分數
+金（財）：旺度分數
+水（官殺）：旺度分數
+並說明哪個五行最旺、哪個最弱。
 
-▍二、針對您的問題「{question}」
-直接回答這個問題，給出：
-- 目前命盤是否支持這個方向（明確說支持或不支持）
-- 最佳行動時機（具體到幾月或哪個季節）
-- 一個具體的行動步驟（要可以立刻執行的）
+【第三步：定格局與取用神】
+- 格局：說明是建祿格／偏印格／食神格等（說明判斷依據）
+- 身強或身弱：明確判斷並說明原因
+- 用神：明確說出用神是哪個五行，並說明為何取此用神
 
-▍三、{current_year} 年職場流年
-說明今年官祿宮的流年狀況：
+【第四步：職場命格解析】
+▍事業特質
+- 日主天干的職場特性（具體說出 2~3 個特質）
+- 最適合的職業類型（列出 3 種具體職業名稱）
+- 職場上的天生優勢（2點）與盲點（1點）
+
+▍針對問題「{question}」的直接回答
+- 命盤是否支持這個方向（明確說支持或不支持，說明原因）
+- 最佳行動時機（具體到幾月或哪個節氣）
+- 一個可以立刻執行的具體建議
+
+▍{current_year} 年流年職場分析
+- 說明 {current_year} 年天干地支，與日主的生剋關係
+- 官祿宮流年吉凶（★評分，滿分5顆）
 - 升遷或轉職機會最大的月份（具體說出幾月）
-- 需要小心的職場人際陷阱（具體說出是什麼情況）
-- 貴人特徵（什麼樣的人、來自哪個方位）
+- 需要小心的職場陷阱（具體說出是什麼）
 
-▍四、開運建議
-- 開運顏色（穿著建議，說出具體顏色）
-- 辦公桌方位建議（東南西北哪個方向）
-- 本月最重要的一個具體行動
+▍開運建議
+- 用神對應的開運顏色（說出具體顏色）
+- 用神對應的開運方位（說出東南西北哪個方向）
+- 本月最重要的一個行動建議
 
-語氣溫柔神秘但直接，像命理師在給具體建議，總字數約 400 字。"""
-
+語氣溫柔神秘但直接，像命理師在親批命盤，總字數約 500 字。"""
 
         chat_completion = groq_client.chat.completions.create(
             messages=[
@@ -1265,12 +1507,12 @@ def _run_career_background(line_user_id, data, service_id):
 
 
 # ══════════════════════════════════════════
-#  ★ 財運分析核心（加入性別 + 時辰）
+#  財運分析核心（背景執行）
 # ══════════════════════════════════════════
 
 def _run_wealth_background(line_user_id, data, service_id):
     try:
-        time.sleep(random.uniform(240, 360))
+        time.sleep(random.uniform(50, 70))
 
         birth = data.get("birth", "未知")
         question = data.get("question", "")
@@ -1290,6 +1532,7 @@ def _run_wealth_background(line_user_id, data, service_id):
 
         tz = pytz.timezone("Asia/Taipei")
         current_year = datetime.datetime.now(tz).year
+
         user_prompt = f"""你是一位精通四柱八字與易經的財運命理師，請用繁體中文進行專業財運解析。
 
 【命主資料】
@@ -1308,7 +1551,7 @@ def _run_wealth_background(line_user_id, data, service_id):
 
 ▍二、卦象解析「{hexagram}」
 說明此卦對財運的啟示：
-- 卦象的核心訊息（1~2句，要有命理依據）
+- 【{hexagram}】的上下卦象意（說明上卦與下卦各代表什麼）
 - 對「{question}」這個問題的直接回應
 - 吉凶判斷（明確說吉或凶，給出★評分，滿分5顆）
 
@@ -1324,12 +1567,11 @@ def _run_wealth_background(line_user_id, data, service_id):
 - 最佳行動時機（具體到幾月或哪個節氣）
 
 ▍五、財運開運錦囊
-- 開運顏色（說出具體顏色）
+- 開運顏色（說出具體顏色，說明五行依據）
 - 財位方向（東南西北哪個方位，說出原因）
 - 一句最重要的財運建議
 
 語氣溫柔神秘但直接，總字數約 400 字。"""
-
 
         chat_completion = groq_client.chat.completions.create(
             messages=[
@@ -1379,12 +1621,12 @@ def _run_wealth_background(line_user_id, data, service_id):
 
 
 # ══════════════════════════════════════════
-#  ★ 天書服務核心（加入性別 + 時辰）
+#  雙人合盤核心（背景執行）
 # ══════════════════════════════════════════
 
 def _run_double_chart_background(line_user_id, data, service_id):
     try:
-        time.sleep(random.uniform(720, 1080))
+        time.sleep(random.uniform(270, 330))
 
         birth1 = data.get("birth1", "未知")
         birth2 = data.get("birth2", "未知")
@@ -1433,7 +1675,6 @@ def _run_double_chart_background(line_user_id, data, service_id):
 
 語氣溫柔神秘，像命理師親批，總字數約 500 字。"""
 
-
         chat_completion = groq_client.chat.completions.create(
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -1465,9 +1706,13 @@ def _run_double_chart_background(line_user_id, data, service_id):
         push_text(line_user_id, "✨ 星辰訊號有些微干擾，請稍後再試 🙏")
 
 
+# ══════════════════════════════════════════
+#  流年運勢核心（背景執行）
+# ══════════════════════════════════════════
+
 def _run_year_fortune_background(line_user_id, data, service_id):
     try:
-        time.sleep(random.uniform(720, 1080))
+        time.sleep(random.uniform(270, 330))
 
         birth = data.get("birth", "未知")
         gender = data.get("gender", "")
@@ -1522,7 +1767,6 @@ def _run_year_fortune_background(line_user_id, data, service_id):
 
 語氣溫柔神秘，像命理師親批，總字數約 550 字。"""
 
-
         chat_completion = groq_client.chat.completions.create(
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -1554,9 +1798,13 @@ def _run_year_fortune_background(line_user_id, data, service_id):
         push_text(line_user_id, "✨ 星辰訊號有些微干擾，請稍後再試 🙏")
 
 
+# ══════════════════════════════════════════
+#  紫微斗數核心（背景執行）
+# ══════════════════════════════════════════
+
 def _run_ziwei_background(line_user_id, data, service_id):
     try:
-        time.sleep(random.uniform(720, 1080))
+        time.sleep(random.uniform(270, 330))
 
         birth = data.get("birth", "未知")
         shichen = data.get("shichen", "不知道時辰")
@@ -1572,6 +1820,7 @@ def _run_ziwei_background(line_user_id, data, service_id):
 
         tz = pytz.timezone("Asia/Taipei")
         current_year = datetime.datetime.now(tz).year
+
         user_prompt = f"""你是一位精通紫微斗數三十年的命理師，請用繁體中文進行專業批命。
 
 【命主資料】
@@ -1612,7 +1861,6 @@ def _run_ziwei_background(line_user_id, data, service_id):
 
 語氣溫柔神秘，像命理師親批，總字數約 550 字。"""
 
-
         chat_completion = groq_client.chat.completions.create(
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -1650,7 +1898,7 @@ def _run_ziwei_background(line_user_id, data, service_id):
 
 def _run_follow_up_background(line_user_id, service_type, question, service_id, follow_up_num):
     try:
-        time.sleep(random.uniform(240, 360))
+        time.sleep(random.uniform(50, 70))
 
         service_labels = {
             "double_chart": "💑 雙人合盤",
@@ -1664,8 +1912,20 @@ def _run_follow_up_background(line_user_id, service_type, question, service_id, 
         user_prompt = f"""這是{label}服務的第 {follow_up_num} 次追問。
 用戶的追問：{question}
 
-請根據之前的解讀脈絡，給出約250字的深入回答。
-語氣溫柔神秘，像一位有智慧的命理師繼續為學生解惑。"""
+請根據之前的解讀脈絡，給出深入回答，依序輸出：
+
+▍直接回答
+針對「{question}」給出直接、具體的回答（不能模糊，要有命理或牌義依據）。
+
+▍深入分析
+進一步說明：
+- 為什麼會這樣（說出命理或牌義原因）
+- 具體的時間點或轉折點（說出幾月）
+
+▍行動建議
+給出 1~2 個可以立刻執行的具體建議（說出做什麼、什麼時候做）。
+
+語氣溫柔神秘，像命理師繼續為學生解惑，總字數約 250 字。"""
 
         chat_completion = groq_client.chat.completions.create(
             messages=[
@@ -1755,8 +2015,8 @@ def do_daily_push():
 
 請給出一段約150字的生日特別占卜祝福，包含：
 - 溫暖的生日祝福
-- 今年整體運勢提示
-- 一句鼓勵的話
+- 今年整體運勢提示（說出一個具體的好運時機）
+- 一句具體的鼓勵話語
 語氣溫柔神秘，充滿祝福與愛，像老師給學生的生日叮嚀。"""
 
                 chat_completion = groq_client.chat.completions.create(
@@ -1783,8 +2043,15 @@ def do_daily_push():
         card = random.choice(TAROT_CARDS)
         orientation = "逆位" if random.choice([True, False]) else "正位"
         zodiac_hint = f"使用者的星座是【{zodiac}】，請融入星座特質。\n" if zodiac else ""
-        prompt = f"""{zodiac_hint}今天是 {today_str}，請為使用者抽出今日牌卡【{card}｜{orientation}】，
-給出約100字的每日運勢提醒，語氣溫柔簡短，像老師給學生的早安叮嚀。"""
+        prompt = f"""{zodiac_hint}今天是 {today_str}，請為使用者抽出今日牌卡【{card}｜{orientation}】。
+
+請給出約100字的每日運勢提醒，依序輸出：
+- 【{card}】{orientation}今日給您的核心訊息（1句，根據牌面象徵）
+- 今日最適合做的一件事（具體說出）
+- 今日需要避開的一件事（具體說出）
+- 今日幸運顏色：＿
+
+語氣溫柔簡短，像老師給學生的早安叮嚀。"""
         try:
             chat_completion = groq_client.chat.completions.create(
                 messages=[
@@ -3217,10 +3484,6 @@ def handle_message(event):
             do_reading_async(line_user_id, user_msg, reading_type, False, zodiac, user)
             return
 
-        # ══════════════════════════════════════
-        #  ★ 雙人合盤（加入性別 + 時辰）
-        # ══════════════════════════════════════
-
         elif mode == "double_chart":
             data = state.get("data", {})
             if step == "birth1":
@@ -3326,10 +3589,6 @@ def handle_message(event):
                     ))
                 return
 
-        # ══════════════════════════════════════
-        #  ★ 流年運勢（加入性別 + 時辰）
-        # ══════════════════════════════════════
-
         elif mode == "year_fortune":
             data = state.get("data", {})
             if step == "birth":
@@ -3383,10 +3642,6 @@ def handle_message(event):
                         messages=[TextMessage(text="請點選上方按鈕選擇您的出生時辰 🌙")]
                     ))
                 return
-
-        # ══════════════════════════════════════
-        #  ★ 紫微斗數（原有時辰 + 加入性別）
-        # ══════════════════════════════════════
 
         elif mode == "ziwei":
             data = state.get("data", {})
@@ -3470,10 +3725,6 @@ def handle_message(event):
                         "question_num": question_num + 1
                     }
                 return
-
-        # ══════════════════════════════════════
-        #  ★ 職場運勢（加入性別 + 時辰）
-        # ══════════════════════════════════════
 
         elif mode == "career":
             data = state.get("data", {})
@@ -3567,10 +3818,6 @@ def handle_message(event):
                 )
                 t.start()
                 return
-
-        # ══════════════════════════════════════
-        #  ★ 財運分析（加入性別 + 時辰）
-        # ══════════════════════════════════════
 
         elif mode == "wealth":
             data = state.get("data", {})
@@ -4173,7 +4420,7 @@ def handle_message(event):
 
 
 # ══════════════════════════════════════════
-#  ★ Postback 事件處理（加入 gender_ 處理）
+#  Postback 事件處理
 # ══════════════════════════════════════════
 
 @handler.add(PostbackEvent)
@@ -4184,16 +4431,15 @@ def handle_postback(event):
     zodiac = get_zodiac(user.get("birth_date")) if user.get("birth_date") else None
 
     # ══════════════════════════════════════
-    #  ★ 性別選擇處理（所有服務共用）
+    #  性別選擇處理（所有服務共用）
     # ══════════════════════════════════════
 
     if data.startswith("gender_"):
-        # data 格式：gender_M_career / gender_F_ziwei / gender_M_double_chart_1 等
-        parts = data.split("_", 2)  # ["gender", "M/F", "context"]
+        parts = data.split("_", 2)
         if len(parts) < 3:
             return
-        gender_val = parts[1]   # "M" or "F"
-        context    = parts[2]   # "career" / "wealth" / "year_fortune" / "ziwei" / "double_chart_1" / "double_chart_2"
+        gender_val = parts[1]
+        context    = parts[2]
 
         if line_user_id not in pending_state:
             with ApiClient(configuration) as api_client:
@@ -4204,9 +4450,7 @@ def handle_postback(event):
             return
 
         state = pending_state[line_user_id]
-        mode  = state.get("mode")
         d     = state.get("data", {})
-
         gender_label = "男性 👨" if gender_val == "M" else "女性 👩"
 
         if context == "double_chart_1":
@@ -4214,12 +4458,13 @@ def handle_postback(event):
             state["data"] = d
             state["step"] = "shichen1"
             pending_state[line_user_id] = state
-            # 顯示時辰選擇，用特殊 context 標記是甲方
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[TextMessage(text=f"✅ 甲方性別：{gender_label}\n\n請選擇甲方的出生時辰 🌙"),
-                               build_shichen_flex()]
+                    messages=[
+                        TextMessage(text=f"✅ 甲方性別：{gender_label}\n\n請選擇甲方的出生時辰 🌙"),
+                        build_shichen_flex()
+                    ]
                 ))
 
         elif context == "double_chart_2":
@@ -4230,12 +4475,13 @@ def handle_postback(event):
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[TextMessage(text=f"✅ 乙方性別：{gender_label}\n\n請選擇乙方的出生時辰 🌙"),
-                               build_shichen_flex()]
+                    messages=[
+                        TextMessage(text=f"✅ 乙方性別：{gender_label}\n\n請選擇乙方的出生時辰 🌙"),
+                        build_shichen_flex()
+                    ]
                 ))
 
         else:
-            # career / wealth / year_fortune / ziwei
             d["gender"] = gender_val
             state["data"] = d
             state["step"] = "shichen"
@@ -4243,8 +4489,10 @@ def handle_postback(event):
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest(
                     reply_token=event.reply_token,
-                    messages=[TextMessage(text=f"✅ 性別：{gender_label}\n\n請選擇您的出生時辰 🌙"),
-                               build_shichen_flex()]
+                    messages=[
+                        TextMessage(text=f"✅ 性別：{gender_label}\n\n請選擇您的出生時辰 🌙"),
+                        build_shichen_flex()
+                    ]
                 ))
         return
 
@@ -4298,13 +4546,11 @@ def handle_postback(event):
                     messages=[TextMessage(text="⚠️ 狀態已過期，請重新開始 🙏")]
                 ))
             return
-        state     = pending_state[line_user_id]
-        mode      = state.get("mode")
-        step      = state.get("step")
-        data_dict = state.get("data", {})
+        state = pending_state[line_user_id]
+        mode  = state.get("mode")
+        step  = state.get("step")
 
         if step == "birth1_confirm":
-            # 雙人合盤：甲方確認 → 選性別
             state["step"] = "gender1"
             pending_state[line_user_id] = state
             with ApiClient(configuration) as api_client:
@@ -4312,9 +4558,7 @@ def handle_postback(event):
                     reply_token=event.reply_token,
                     messages=[build_gender_flex("double_chart_1")]
                 ))
-
         elif step == "birth2_confirm":
-            # 雙人合盤：乙方確認 → 選性別
             state["step"] = "gender2"
             pending_state[line_user_id] = state
             with ApiClient(configuration) as api_client:
@@ -4322,7 +4566,6 @@ def handle_postback(event):
                     reply_token=event.reply_token,
                     messages=[build_gender_flex("double_chart_2")]
                 ))
-
         elif step == "birth_confirm" and mode == "year_fortune":
             state["step"] = "gender"
             pending_state[line_user_id] = state
@@ -4331,7 +4574,6 @@ def handle_postback(event):
                     reply_token=event.reply_token,
                     messages=[build_gender_flex("year_fortune")]
                 ))
-
         elif step == "birth_confirm" and mode == "ziwei":
             state["step"] = "gender"
             pending_state[line_user_id] = state
@@ -4340,7 +4582,6 @@ def handle_postback(event):
                     reply_token=event.reply_token,
                     messages=[build_gender_flex("ziwei")]
                 ))
-
         elif step == "birth_confirm" and mode == "career":
             state["step"] = "gender"
             pending_state[line_user_id] = state
@@ -4349,7 +4590,6 @@ def handle_postback(event):
                     reply_token=event.reply_token,
                     messages=[build_gender_flex("career")]
                 ))
-
         elif step == "birth_confirm" and mode == "wealth":
             state["step"] = "gender"
             pending_state[line_user_id] = state
@@ -4598,7 +4838,7 @@ def handle_postback(event):
         return
 
     # ══════════════════════════════════════
-    #  ★ 時辰選擇（所有服務共用，依 mode 分流）
+    #  時辰選擇（所有服務共用）
     # ══════════════════════════════════════
 
     elif data.startswith("shichen_"):
@@ -4615,7 +4855,6 @@ def handle_postback(event):
         mode  = state.get("mode")
         step  = state.get("step")
         d     = state.get("data", {})
-
         shichen_label = shichen if shichen != "不知道時辰" else "不知道時辰（將以主要格局推算）"
 
         if mode == "ziwei" and step == "shichen":
@@ -4736,7 +4975,6 @@ def handle_postback(event):
 
         limit = FOLLOW_UP_LIMITS.get(service_type, 0)
 
-        # ★ 直接從 DB 查最新狀態，不用快取
         svc_result = supabase.table("services") \
             .select("*") \
             .eq("user_id", line_user_id) \
@@ -4756,38 +4994,10 @@ def handle_postback(event):
         svc = svc_result.data[0]
         current_count = svc.get("follow_up_count") or 0
 
-        # ★ 已完成或已達上限，直接拒絕
         if svc.get("status") == "completed" or current_count >= limit:
             supabase.table("services").update({
                 "status": "completed"
             }).eq("service_id", svc["service_id"]).execute()
-            with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[TextMessage(text="⚠️ 追問次數已全部使用完畢 🙏\n\n若有新的困惑，歡迎再次購買服務 💎")]
-                ))
-            return
-
-        # ★ 卡片版本過期（用戶點了舊的追問按鈕）
-        if expected_count is not None and current_count != expected_count:
-            with ApiClient(configuration) as api_client:
-                MessagingApi(api_client).reply_message(ReplyMessageRequest(
-                    reply_token=event.reply_token,
-                    messages=[TextMessage(text="⚠️ 此追問卡片已失效，請查看最新的解析訊息 🙏")]
-                ))
-            return
-
-
-        current_count = svc.get("follow_up_count") or 0
-        limit = FOLLOW_UP_LIMITS.get(service_type, 0)
-
-        if current_count >= limit:
-            try:
-                supabase.table("services").update({
-                    "status": "completed"
-                }).eq("service_id", svc["service_id"]).execute()
-            except Exception:
-                pass
             with ApiClient(configuration) as api_client:
                 MessagingApi(api_client).reply_message(ReplyMessageRequest(
                     reply_token=event.reply_token,
@@ -4896,4 +5106,3 @@ scheduler.start()
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
