@@ -954,7 +954,7 @@ def _run_reading_background(line_user_id, user_msg, reading_type, is_deep, zodia
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt}
             ],
-            model="llama-3.3-70b-versatile",
+            model="llama3-70b-8192",
         )
         response_text = chat_completion.choices[0].message.content
         category = f"急救占卜｜{type_label}" if is_deep else f"一般占卜｜{type_label}"
@@ -1127,7 +1127,7 @@ def _run_weekly_fortune_background(line_user_id, reading_type, zodiac, user):
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt}
             ],
-            model="llama-3.3-70b-versatile",
+            model="llama3-70b-8192",
         )
         response_text = chat_completion.choices[0].message.content
 
@@ -1203,7 +1203,7 @@ def _run_spiritual_background(line_user_id, data, zodiac):
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt}
             ],
-            model="llama-3.3-70b-versatile",
+            model="llama3-70b-8192",
         )
         response_text = chat_completion.choices[0].message.content
 
@@ -1264,7 +1264,7 @@ def _run_fortune_stick_background(line_user_id, category, question, stick):
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt}
             ],
-            model="llama-3.3-70b-versatile",
+            model="llama3-70b-8192",
         )
         response_text = chat_completion.choices[0].message.content
 
@@ -1338,7 +1338,7 @@ def _run_love_reading_background(line_user_id, situation, question_num, service_
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt}
             ],
-            model="llama-3.3-70b-versatile",
+            model="llama3-70b-8192",
         )
         response_text = chat_completion.choices[0].message.content
 
@@ -1464,7 +1464,7 @@ def _run_career_background(line_user_id, data, service_id):
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt}
             ],
-            model="llama-3.3-70b-versatile",
+            model="llama3-70b-8192",
         )
         response_text = chat_completion.choices[0].message.content
 
@@ -1578,7 +1578,7 @@ def _run_wealth_background(line_user_id, data, service_id):
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt}
             ],
-            model="llama-3.3-70b-versatile",
+            model="llama3-70b-8192",
         )
         response_text = chat_completion.choices[0].message.content
 
@@ -1680,7 +1680,7 @@ def _run_double_chart_background(line_user_id, data, service_id):
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt}
             ],
-            model="llama-3.3-70b-versatile",
+            model="llama3-70b-8192",
         )
         response_text = chat_completion.choices[0].message.content
         mark_service_used(service_id)
@@ -1772,7 +1772,7 @@ def _run_year_fortune_background(line_user_id, data, service_id):
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt}
             ],
-            model="llama-3.3-70b-versatile",
+            model="llama3-70b-8192",
         )
         response_text = chat_completion.choices[0].message.content
         mark_service_used(service_id)
@@ -1866,7 +1866,7 @@ def _run_ziwei_background(line_user_id, data, service_id):
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt}
             ],
-            model="llama-3.3-70b-versatile",
+            model="llama3-70b-8192",
         )
         response_text = chat_completion.choices[0].message.content
         mark_service_used(service_id)
@@ -1932,7 +1932,7 @@ def _run_follow_up_background(line_user_id, service_type, question, service_id, 
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt}
             ],
-            model="llama-3.3-70b-versatile",
+            model="llama3-70b-8192",
         )
         response_text = chat_completion.choices[0].message.content
 
@@ -2024,7 +2024,7 @@ def do_daily_push():
                         {"role": "system", "content": SYSTEM_PROMPT},
                         {"role": "user", "content": birthday_prompt}
                     ],
-                    model="llama-3.3-70b-versatile",
+                    model="llama3-70b-8192",
                 )
                 birthday_reading = chat_completion.choices[0].message.content
                 crystal_footer = get_lucky_item_text()
@@ -2058,7 +2058,7 @@ def do_daily_push():
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": prompt}
                 ],
-                model="llama-3.3-70b-versatile",
+                model="llama3-70b-8192",
             )
             reading = chat_completion.choices[0].message.content
             crystal_footer = get_lucky_item_text()
